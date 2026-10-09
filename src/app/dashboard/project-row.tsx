@@ -5,7 +5,13 @@ import type { Project } from "@/actions/project-types";
 import { deleteProjectAction, renameProjectAction } from "./project-actions";
 import { PROJECT_TYPE_LABELS } from "./nav";
 
-const dateFormat = new Intl.DateTimeFormat("uz-UZ", { day: "numeric", month: "short", year: "numeric" });
+// Server va brauzerda bir xil chiqishi uchun Intl o'rniga qo'lda formatlaymiz (hydration xatosining oldini oladi)
+const UZ_MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  const tashkent = new Date(d.getTime() + 5 * 60 * 60 * 1000); // UTC+5
+  return `${tashkent.getUTCDate()}-${UZ_MONTHS[tashkent.getUTCMonth()]}, ${tashkent.getUTCFullYear()}`;
+}
 
 export function ProjectRow({ project }: { project: Project }) {
   const [editing, setEditing] = useState(false);
@@ -79,7 +85,7 @@ export function ProjectRow({ project }: { project: Project }) {
             <span className="rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700">
               {PROJECT_TYPE_LABELS[project.type]}
             </span>{" "}
-            · {dateFormat.format(new Date(project.created_at))}
+            · {formatDate(project.created_at)}
           </p>
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         </div>
