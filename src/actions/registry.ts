@@ -1,5 +1,13 @@
 import type { ActionDefinition } from "./define";
 import { createProject, deleteProject, listProjects, renameProject } from "./projects";
+import {
+  addCustomDomain,
+  checkCustomDomain,
+  getPublishStatus,
+  publishWebsite,
+  removeCustomDomain,
+  unpublishWebsite,
+} from "./publishing";
 import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
 
 /**
@@ -17,6 +25,12 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   generateWebsite,
   editWebsiteWithAI,
   saveWebsite,
+  getPublishStatus,
+  publishWebsite,
+  unpublishWebsite,
+  addCustomDomain,
+  checkCustomDomain,
+  removeCustomDomain,
 ];
 
 export function getAction(name: string) {

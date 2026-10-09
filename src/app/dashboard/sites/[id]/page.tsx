@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { runAction } from "@/actions/run";
 import { getWebsite } from "@/actions/websites";
+import { getPublishStatus } from "@/actions/publishing";
 import { isAiEnabled } from "@/lib/ai/config";
 import { GenerateForm } from "./generate-form";
 import { SiteEditor } from "./editor";
@@ -32,6 +33,7 @@ export default async function SiteEditorPage({
 
   const website = result.data;
   const aiEnabled = isAiEnabled();
+  const publish = website.content ? await runAction(getPublishStatus, { projectId: id }) : null;
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -43,8 +45,11 @@ export default async function SiteEditorPage({
         <span className="font-medium text-ink">{website.projectName}</span>
       </div>
 
-      {website.content ? (
+      {website.content && publish && !publish.ok ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{publish.error}</p>
+      ) : website.content && publish?.ok ? (
         <SiteEditor
+          publishStatus={publish.data}
           projectId={website.projectId}
           initialSite={website.content}
           initialVersion={website.version}

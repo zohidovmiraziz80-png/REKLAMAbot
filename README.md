@@ -5,7 +5,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Holat:** 2-bosqich (Website Builder) — 6 ta tayyor shablondan sayt yaratish, vizual tahrirlovchi, ko'rib chiqish sahifasi. AI (yaratish va tahrirlash) kodi tayyor, lekin `AI_ENABLED=true` qo'yilmaguncha o'chiq.
+**Holat:** 3-bosqich (Nashr qilish) — sayt `/s/<nom>` manzilida internetga chiqadi; asosiy domen ulanganda `<nom>.<domen>` subdomeni; o'z domenini ulash (Vercel API) va `/admin/domains` admin paneli.
+
+**2-bosqich (Website Builder)** — 6 ta tayyor shablondan sayt yaratish, vizual tahrirlovchi, ko'rib chiqish sahifasi. AI (yaratish va tahrirlash) kodi tayyor, lekin `AI_ENABLED=true` qo'yilmaguncha o'chiq.
 
 **1-bosqich (Asos):** ro'yxatdan o'tish (telefon raqami bilan, email kod orqali tasdiqlanadi), login, parolni kod orqali tiklash, workspace, loyihalar dashboardi va amallar qatlami.
 
@@ -17,7 +19,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql`) joylab **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari
@@ -49,6 +51,12 @@ SMTP ulanmaguncha standart xat (faqat havola) boradi; sayt ikkala usulni ham qab
 
 ### 4.1 AI (ixtiyoriy, hozircha o'chiq)
 Yoqish uchun Vercel'da `AI_ENABLED=true` qo'shing. Vercel'da AI Gateway OIDC orqali avtomatik ishlaydi (kalit kerak emas). Muqobil: `AI_GATEWAY_API_KEY` yoki `ANTHROPIC_API_KEY`. Model: `AI_MODEL` (standart `anthropic/claude-sonnet-5.5`). Har bir workspace uchun kuniga 30 ta AI so'rovi.
+
+### 4.2 Nashr qilish va domenlar
+- **Hozir:** saytlar `https://<platforma>/s/<nom>` manzilida ochiladi — qo'shimcha sozlash kerak emas.
+- **Subdomenlar** (`gulzor.tezdokon.uz`): domen sotib oling, Vercel → Domains'da `tezdokon.uz` va `*.tezdokon.uz` ni qo'shing (wildcard uchun domen nameserver'lari Vercel'da bo'lishi kerak), keyin `NEXT_PUBLIC_ROOT_DOMAIN=tezdokon.uz`.
+- **O'z domeni:** `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` qo'shilgach, foydalanuvchilar "Nashr qilish" oynasidan domen ulaydi va DNS yozuvlarini ko'radi.
+- **Admin:** `insert into public.platform_admins (user_id) values ('<auth.users id>');` → `/admin/domains`.
 
 ### 5. Kompyuterda ishga tushirish (ixtiyoriy)
 ```bash

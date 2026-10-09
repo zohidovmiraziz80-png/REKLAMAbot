@@ -11,7 +11,9 @@ import {
   type BlockType,
   type Site,
 } from "@/lib/site/schema";
+import type { PublishStatus } from "@/actions/publishing";
 import { editWebsiteWithAIAction, saveWebsiteAction } from "./actions";
+import { PublishPanel } from "./publish-panel";
 
 const input =
   "block w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -260,11 +262,13 @@ export function SiteEditor({
   initialSite,
   initialVersion,
   aiEnabled,
+  publishStatus,
 }: {
   projectId: string;
   initialSite: Site;
   initialVersion: number;
   aiEnabled: boolean;
+  publishStatus: PublishStatus;
 }) {
   const [site, setSite] = useState<Site>(initialSite);
   const [version, setVersion] = useState(initialVersion);
@@ -313,6 +317,18 @@ export function SiteEditor({
         setStatus({ kind: "error", text: result.error });
       }
     });
+  }
+
+  /** Nashrdan oldin saqlash (Promise qaytaradi) */
+  async function saveNow(): Promise<boolean> {
+    const result = await saveWebsiteAction(projectId, site, version);
+    if (result.ok) {
+      setVersion(result.data.version);
+      setDirty(false);
+      return true;
+    }
+    setStatus({ kind: "error", text: result.error });
+    return false;
   }
 
   function runAi() {
@@ -417,6 +433,7 @@ export function SiteEditor({
         >
           {saving ? "Saqlanmoqda..." : "Saqlash"}
         </button>
+        <PublishPanel projectId={projectId} initialStatus={publishStatus} dirty={dirty} saveFirst={saveNow} />
       </div>
 
       {/* AI bilan tahrirlash (faqat AI yoqilganda) */}
