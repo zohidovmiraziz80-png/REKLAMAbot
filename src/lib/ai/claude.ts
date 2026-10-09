@@ -24,7 +24,9 @@ export class AIError extends Error {
 const GATEWAY_MODEL = process.env.AI_MODEL ?? "anthropic/claude-sonnet-5.5";
 const DIRECT_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
 
-async function resolveEndpoint() {
+type Endpoint = { url: string; headers: Record<string, string>; model: string };
+
+async function resolveEndpoint(): Promise<Endpoint> {
   if (process.env.AI_GATEWAY_API_KEY) {
     return {
       url: "https://ai-gateway.vercel.sh/v1/messages",

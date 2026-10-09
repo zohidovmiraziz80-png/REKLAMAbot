@@ -480,7 +480,7 @@ export function SiteEditor({
                       <input
                         type="color"
                         value={site.theme[k]}
-                        onChange={(e) => update((s) => ({ ...s, theme: { ...s.theme, [k]: e.target.value } }))}
+                        onChange={(e) => update((s) => ({ ...s, theme: { ...s.theme, [k]: e.target.value } as Site["theme"] }))}
                         className="h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0"
                       />
                       <span className="font-mono text-xs">{site.theme[k]}</span>

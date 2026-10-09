@@ -31,7 +31,7 @@ function themeVars(site: Site): CSSProperties {
     fontFamily: FONTS[site.theme.font],
     background: "var(--s-bg)",
     color: "var(--s-text)",
-  };
+  } as CSSProperties;
 }
 
 const container = "mx-auto w-full max-w-5xl px-5";
