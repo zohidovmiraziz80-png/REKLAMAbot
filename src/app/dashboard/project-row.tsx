@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { Project } from "@/actions/project-types";
 import { deleteProjectAction, renameProjectAction } from "./project-actions";
@@ -79,7 +80,13 @@ export function ProjectRow({ project }: { project: Project }) {
               </button>
             </form>
           ) : (
-            <p className="truncate font-medium">{project.name}</p>
+            project.type === "website" ? (
+              <Link href={`/dashboard/sites/${project.id}`} className="block truncate font-medium hover:text-brand-600">
+                {project.name}
+              </Link>
+            ) : (
+              <p className="truncate font-medium">{project.name}</p>
+            )
           )}
           <p className="mt-1 text-sm text-muted">
             <span className="rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700">
@@ -91,7 +98,15 @@ export function ProjectRow({ project }: { project: Project }) {
         </div>
 
         {!editing && (
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
+            {project.type === "website" && (
+              <Link
+                href={`/dashboard/sites/${project.id}`}
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                Ochish
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => setEditing(true)}

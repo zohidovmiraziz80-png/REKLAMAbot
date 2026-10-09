@@ -5,7 +5,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Hozirgi holat — 1-bosqich (Asos):** ro'yxatdan o'tish (telefon raqami bilan, email kod orqali tasdiqlanadi), login, parolni kod orqali tiklash, workspace, loyihalar dashboardi va amallar qatlami.
+**Holat:** 2-bosqich (AI Website Builder) — AI sayt yaratadi, vizual tahrirlovchi, AI bilan tahrirlash, ko'rib chiqish sahifasi.
+
+**1-bosqich (Asos):** ro'yxatdan o'tish (telefon raqami bilan, email kod orqali tasdiqlanadi), login, parolni kod orqali tiklash, workspace, loyihalar dashboardi va amallar qatlami.
 
 ## Ishga tushirish
 
@@ -15,7 +17,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (avval `..._foundation.sql`, keyin `..._profile_phone.sql`) joylab **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari
@@ -44,6 +46,9 @@ SMTP ulanmaguncha standart xat (faqat havola) boradi; sayt ikkala usulni ham qab
 | `NEXT_PUBLIC_SITE_URL` | Vercel manzilingiz, masalan `https://platforma.vercel.app` |
 
 3. **Deploy** bosing.
+
+### 4.1 AI
+Vercel'da AI Gateway OIDC orqali avtomatik ishlaydi (kalit kerak emas). Muqobil: `AI_GATEWAY_API_KEY` yoki `ANTHROPIC_API_KEY`. Model: `AI_MODEL` (standart `anthropic/claude-sonnet-5.5`). Har bir workspace uchun kuniga 30 ta AI so'rovi.
 
 ### 5. Kompyuterda ishga tushirish (ixtiyoriy)
 ```bash

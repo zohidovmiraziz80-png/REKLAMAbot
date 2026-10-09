@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { PROJECT_TYPES, type ProjectType } from "@/actions/project-types";
 import { createProjectAction } from "./project-actions";
@@ -9,6 +10,7 @@ export function CreateProject({ defaultType }: { defaultType?: ProjectType }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function open() {
     setError(undefined);
@@ -31,6 +33,7 @@ export function CreateProject({ defaultType }: { defaultType?: ProjectType }) {
       if (result.ok) {
         form.reset();
         close();
+        if (result.data.type === "website") router.push(`/dashboard/sites/${result.data.id}`);
       } else {
         setError(result.error);
       }
