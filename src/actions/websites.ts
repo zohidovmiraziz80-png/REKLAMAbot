@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { AIError, callClaudeTool } from "@/lib/ai/claude";
+import { isAiEnabled } from "@/lib/ai/config";
+import { TEMPLATE_IDS, buildFromTemplate } from "@/lib/site/templates";
 import { SITE_SYSTEM_PROMPT, buildEditMessage, buildGenerateMessage } from "@/lib/ai/site-prompts";
 import { siteSchema, type Block, type Site } from "@/lib/site/schema";
 import { SITE_TOOL } from "@/lib/site/tool-schema";
@@ -31,6 +33,9 @@ async function loadProject(ctx: ActionContext, projectId: string) {
 }
 
 async function assertAiQuota(ctx: ActionContext) {
+  if (!isAiEnabled()) {
+    throw new ActionError("forbidden", "AI funksiyalari hozircha yoqilmagan. Saytni shablon orqali yarating va qo'lda tahrirlang.");
+  }
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error } = await ctx.supabase
     .from("audit_logs")
@@ -155,6 +160,38 @@ export const getWebsite = defineAction({
       version: data?.version ?? 0,
       updatedAt: data?.updated_at ?? null,
     };
+  },
+});
+
+export const createWebsiteFromTemplate = defineAction({
+  name: "createWebsiteFromTemplate",
+  description:
+    "Tayyor shablondan sayt yaratadi (AI'siz). Shablonlar: shop, flowers, food, services, beauty, blank. Mavjud sayt bo'lsa, u almashtiriladi",
+  requiresConfirmation: false,
+  input: z.object({
+    projectId: z.string().uuid(),
+    templateId: z.enum(TEMPLATE_IDS),
+    details: z.object({
+      businessName: z.string().trim().min(2, "Biznes nomini kiriting").max(60),
+      phone: z.string().trim().max(30).optional().default(""),
+      telegram: z.string().trim().max(64).optional().default(""),
+      instagram: z.string().trim().max(64).optional().default(""),
+      address: z.string().trim().max(200).optional().default(""),
+    }),
+  }),
+  handler: async (ctx, input): Promise<WebsiteRecord> => {
+    const project = await loadProject(ctx, input.projectId);
+    const phone = input.details.phone ? normalizeUzPhone(input.details.phone) : null;
+    if (input.details.phone && !phone) {
+      throw new ActionError("validation", "Telefon raqami noto'g'ri. Masalan: +998 90 123 45 67");
+    }
+    const site = buildFromTemplate(input.templateId, {
+      ...input.details,
+      phone: phone ? formatUzPhone(phone) : "",
+    });
+    const saved = await saveContent(ctx, project.id, site, { brief: { template: input.templateId, ...input.details } });
+    await logAudit(ctx, "website.create_from_template", { type: "project", id: project.id }, { template: input.templateId });
+    return { projectId: project.id, projectName: project.name, content: site, version: saved.version, updatedAt: saved.updated_at };
   },
 });
 

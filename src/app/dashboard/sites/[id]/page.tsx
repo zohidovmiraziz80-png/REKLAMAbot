@@ -3,16 +3,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { runAction } from "@/actions/run";
 import { getWebsite } from "@/actions/websites";
+import { isAiEnabled } from "@/lib/ai/config";
 import { GenerateForm } from "./generate-form";
 import { SiteEditor } from "./editor";
+import { TemplatePicker } from "./template-picker";
 
-// AI javobi 1 daqiqagacha cho'zilishi mumkin
+// AI yoqilganda javob 1 daqiqagacha cho'zilishi mumkin
 export const maxDuration = 120;
 
 export const metadata: Metadata = { title: "Sayt tahrirlovchisi" };
 
-export default async function SiteEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SiteEditorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ mode?: string }>;
+}) {
   const { id } = await params;
+  const { mode } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
   const result = await runAction(getWebsite, { projectId: id });
@@ -22,6 +31,7 @@ export default async function SiteEditorPage({ params }: { params: Promise<{ id:
   }
 
   const website = result.data;
+  const aiEnabled = isAiEnabled();
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -34,9 +44,16 @@ export default async function SiteEditorPage({ params }: { params: Promise<{ id:
       </div>
 
       {website.content ? (
-        <SiteEditor projectId={website.projectId} initialSite={website.content} initialVersion={website.version} />
-      ) : (
+        <SiteEditor
+          projectId={website.projectId}
+          initialSite={website.content}
+          initialVersion={website.version}
+          aiEnabled={aiEnabled}
+        />
+      ) : aiEnabled && mode === "ai" ? (
         <GenerateForm projectId={website.projectId} defaultName={website.projectName} />
+      ) : (
+        <TemplatePicker projectId={website.projectId} defaultName={website.projectName} aiEnabled={aiEnabled} />
       )}
     </div>
   );

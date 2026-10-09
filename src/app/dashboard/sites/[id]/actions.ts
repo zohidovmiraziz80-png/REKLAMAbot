@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
-import { editWebsiteWithAI, generateWebsite, saveWebsite } from "@/actions/websites";
+import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, saveWebsite } from "@/actions/websites";
 
 // Tahrirlovchi tugmalari amallar qatlamini shu Server Action'lar orqali chaqiradi.
 
@@ -25,6 +25,12 @@ export async function editWebsiteWithAIAction(projectId: string, instruction: st
 
 export async function saveWebsiteAction(projectId: string, content: unknown, expectedVersion: number) {
   const result = await runAction(saveWebsite, { projectId, content, expectedVersion });
+  if (result.ok) refresh(projectId);
+  return result;
+}
+
+export async function createFromTemplateAction(projectId: string, templateId: string, details: Record<string, string>) {
+  const result = await runAction(createWebsiteFromTemplate, { projectId, templateId, details });
   if (result.ok) refresh(projectId);
   return result;
 }

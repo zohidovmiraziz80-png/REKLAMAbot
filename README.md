@@ -5,7 +5,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Holat:** 2-bosqich (AI Website Builder) — AI sayt yaratadi, vizual tahrirlovchi, AI bilan tahrirlash, ko'rib chiqish sahifasi.
+**Holat:** 2-bosqich (Website Builder) — 6 ta tayyor shablondan sayt yaratish, vizual tahrirlovchi, ko'rib chiqish sahifasi. AI (yaratish va tahrirlash) kodi tayyor, lekin `AI_ENABLED=true` qo'yilmaguncha o'chiq.
 
 **1-bosqich (Asos):** ro'yxatdan o'tish (telefon raqami bilan, email kod orqali tasdiqlanadi), login, parolni kod orqali tiklash, workspace, loyihalar dashboardi va amallar qatlami.
 
@@ -47,8 +47,8 @@ SMTP ulanmaguncha standart xat (faqat havola) boradi; sayt ikkala usulni ham qab
 
 3. **Deploy** bosing.
 
-### 4.1 AI
-Vercel'da AI Gateway OIDC orqali avtomatik ishlaydi (kalit kerak emas). Muqobil: `AI_GATEWAY_API_KEY` yoki `ANTHROPIC_API_KEY`. Model: `AI_MODEL` (standart `anthropic/claude-sonnet-5.5`). Har bir workspace uchun kuniga 30 ta AI so'rovi.
+### 4.1 AI (ixtiyoriy, hozircha o'chiq)
+Yoqish uchun Vercel'da `AI_ENABLED=true` qo'shing. Vercel'da AI Gateway OIDC orqali avtomatik ishlaydi (kalit kerak emas). Muqobil: `AI_GATEWAY_API_KEY` yoki `ANTHROPIC_API_KEY`. Model: `AI_MODEL` (standart `anthropic/claude-sonnet-5.5`). Har bir workspace uchun kuniga 30 ta AI so'rovi.
 
 ### 5. Kompyuterda ishga tushirish (ixtiyoriy)
 ```bash

@@ -14,7 +14,7 @@ Asosiy bozor: O'zbekiston. Interfeys tili o'zbek tili (lotin yozuvi), keyinroq r
 
 ## Asosiy qarorlar
 
-1. **Sayt yaratish.** AI saytni yaratadi, keyin foydalanuvchi uni vizual tahrirlaydi.
+1. **Sayt yaratish.** Hozircha tayyor shablondan qo'lda (AI'siz). AI yaratish/tahrirlash kodi bor, `AI_ENABLED=true` bilan yoqiladi (keyin tarif bo'yicha).
    - AI HTML yozmaydi. U bloklardan iborat JSON tuzilma qaytaradi.
    - JSON zod sxemasi bilan tekshiriladi va faqat ruxsat etilgan komponentlar orqali render qilinadi.
 2. **Telegram bot.** Foydalanuvchi BotFather'dan olgan tokenini ulaydi.

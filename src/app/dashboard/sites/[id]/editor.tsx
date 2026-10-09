@@ -259,10 +259,12 @@ export function SiteEditor({
   projectId,
   initialSite,
   initialVersion,
+  aiEnabled,
 }: {
   projectId: string;
   initialSite: Site;
   initialVersion: number;
+  aiEnabled: boolean;
 }) {
   const [site, setSite] = useState<Site>(initialSite);
   const [version, setVersion] = useState(initialVersion);
@@ -417,7 +419,8 @@ export function SiteEditor({
         </button>
       </div>
 
-      {/* AI bilan tahrirlash */}
+      {/* AI bilan tahrirlash (faqat AI yoqilganda) */}
+      {aiEnabled && (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -449,6 +452,7 @@ export function SiteEditor({
           )}
         </div>
       </form>
+      )}
 
       {/* Telefon uchun almashtirgich */}
       <div className="flex rounded-lg border border-line bg-white p-1 lg:hidden">

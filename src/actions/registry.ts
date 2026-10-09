@@ -1,6 +1,6 @@
 import type { ActionDefinition } from "./define";
 import { createProject, deleteProject, listProjects, renameProject } from "./projects";
-import { editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
+import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
 
 /**
  * Barcha amallar reyestri. Yangi amal yozilganda shu ro'yxatga qo'shiladi.
@@ -13,6 +13,7 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   renameProject,
   deleteProject,
   getWebsite,
+  createWebsiteFromTemplate,
   generateWebsite,
   editWebsiteWithAI,
   saveWebsite,
