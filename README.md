@@ -3,6 +3,8 @@
 AI yordamida sayt, Telegram bot va avtomatlashtirish yaratadigan SaaS platforma.
 Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
+**Sayt:** https://platforma-ebon.vercel.app
+
 **Hozirgi holat — 1-bosqich (Asos):** ro'yxatdan o'tish, login, parolni tiklash, workspace, loyihalar dashboardi va amallar qatlami.
 
 ## Ishga tushirish
