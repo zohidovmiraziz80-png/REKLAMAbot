@@ -29,7 +29,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 > **Authentication → Providers → Email** ichida "Confirm email" ni vaqtincha o'chirib qo'yish mumkin.
 
 ### 3.1 Email shablonlari (kod)
-**Authentication → Email Templates** ichida **Confirm signup** va **Reset password** shablonlariga `{{ .Token }}` (6 xonali kod) qo'yilgan. Havola emas, kod yuboriladi.
+Supabase shablonlarni faqat **o'z SMTP** ulanganda tahrirlashga ruxsat beradi (Authentication → Emails → SMTP Settings).
+SMTP ulangach, `supabase/email-templates/` ichidagi shablonlarni **Confirm sign up** va **Reset password** ga qo'ying — xatda 6 xonali kod (`{{ .Token }}`) va zaxira tugma bo'ladi.
+SMTP ulanmaguncha standart xat (faqat havola) boradi; sayt ikkala usulni ham qabul qiladi.
 
 ### 4. Vercel
 1. [vercel.com](https://vercel.com) → **Add New → Project** → shu GitHub repozitoriyni tanlang.

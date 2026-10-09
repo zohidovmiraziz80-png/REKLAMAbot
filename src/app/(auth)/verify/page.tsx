@@ -29,8 +29,8 @@ export default async function VerifyPage() {
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Emailni tasdiqlang</h1>
       <p className="mt-1 mb-6 text-sm text-muted">
-        <span className="font-medium text-ink">{maskEmail(pending.email)}</span> manziliga tasdiqlash kodi yuborildi.
-        Kodni quyida kiriting.
+        <span className="font-medium text-ink">{maskEmail(pending.email)}</span> manziliga tasdiqlash xati yuborildi.
+        Xatdagi kodni quyida kiriting yoki xatdagi tasdiqlash tugmasini bosing.
       </p>
       <VerifyCodeForm />
       <ResendCodeForm />
