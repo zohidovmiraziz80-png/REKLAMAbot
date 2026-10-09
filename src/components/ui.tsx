@@ -10,6 +10,9 @@ export function Field({
   required = true,
   placeholder,
   defaultValue,
+  inputMode,
+  maxLength,
+  className,
 }: {
   label: string;
   name: string;
@@ -18,6 +21,9 @@ export function Field({
   required?: boolean;
   placeholder?: string;
   defaultValue?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
+  className?: string;
 }) {
   return (
     <label className="block">
@@ -29,7 +35,9 @@ export function Field({
         required={required}
         placeholder={placeholder}
         defaultValue={defaultValue}
-        className="block w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+        inputMode={inputMode}
+        maxLength={maxLength}
+        className={`block w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 ${className ?? ""}`}
       />
     </label>
   );

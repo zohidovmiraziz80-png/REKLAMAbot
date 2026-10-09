@@ -1,11 +1,11 @@
-# Platforma
+# TezDo'kon
 
 AI yordamida sayt, Telegram bot va avtomatlashtirish yaratadigan SaaS platforma.
 Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Hozirgi holat — 1-bosqich (Asos):** ro'yxatdan o'tish, login, parolni tiklash, workspace, loyihalar dashboardi va amallar qatlami.
+**Hozirgi holat — 1-bosqich (Asos):** ro'yxatdan o'tish (telefon raqami bilan, email kod orqali tasdiqlanadi), login, parolni kod orqali tiklash, workspace, loyihalar dashboardi va amallar qatlami.
 
 ## Ishga tushirish
 
@@ -15,7 +15,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/20261009000000_foundation.sql` faylining butun matnini joylang va **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (avval `..._foundation.sql`, keyin `..._profile_phone.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari
@@ -27,6 +27,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 > Supabase'ning bepul email xizmati soatiga bir nechta xat bilan cheklangan. Sinov paytida xat kelmasa,
 > **Authentication → Providers → Email** ichida "Confirm email" ni vaqtincha o'chirib qo'yish mumkin.
+
+### 3.1 Email shablonlari (kod)
+**Authentication → Email Templates** ichida **Confirm signup** va **Reset password** shablonlariga `{{ .Token }}` (6 xonali kod) qo'yilgan. Havola emas, kod yuboriladi.
 
 ### 4. Vercel
 1. [vercel.com](https://vercel.com) → **Add New → Project** → shu GitHub repozitoriyni tanlang.

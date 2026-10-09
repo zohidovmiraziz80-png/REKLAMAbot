@@ -1,10 +1,10 @@
-# Platforma: loyiha konteksti (Claude Code uchun)
+# TezDo'kon: loyiha konteksti (Claude Code uchun)
 
 Bu fayl repozitoriyning ildizida turadi. Claude Code har safar shu faylni o'qiydi va butun loyiha bo'yicha bir xil qoidalarga amal qiladi.
 
 ## Platforma nima
 
-SaaS platforma. Foydalanuvchilar AI yordamida quyidagilarni yaratadi va boshqaradi:
+TezDo'kon (shiori: "Tezkor onlayn savdo") — SaaS platforma. Foydalanuvchilar AI yordamida quyidagilarni yaratadi va boshqaradi:
 - veb-saytlar,
 - Telegram botlar,
 - avtomatlashtirishlar,

@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin", "cyrillic"], display: "swap" });
 
 export const metadata: Metadata = {
   title: {
-    default: "Platforma — AI bilan sayt, bot va avtomatlashtirish",
-    template: "%s · Platforma",
+    default: "TezDo'kon — tezkor onlayn savdo",
+    template: "%s · TezDo'kon",
   },
   description: "AI yordamida sayt, Telegram bot va avtomatlashtirishlarni bir joyda yarating va boshqaring.",
 };
