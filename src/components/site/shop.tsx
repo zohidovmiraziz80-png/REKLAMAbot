@@ -190,6 +190,7 @@ export function ShopSection({
   }, [shop.products, layout.category, layout.limit]);
   const [category, setCategory] = useState<string>("");
   const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(48);
   const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
@@ -305,7 +306,13 @@ export function ShopSection({
         {showTools && (
           <div className="sticky top-16 z-[5] -mx-4 mt-6 space-y-2 bg-[color:var(--s-bg)]/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
             {showSearch && (
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 Qidirish…" className={`${input} py-2`} />
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setShown(48);
+                }}
+                placeholder="🔍 Qidirish…" className={`${input} py-2`} />
             )}
             {categories.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -313,7 +320,10 @@ export function ShopSection({
                   <button
                     key={c || "all"}
                     type="button"
-                    onClick={() => setCategory(c)}
+                    onClick={() => {
+                      setCategory(c);
+                      setShown(48);
+                    }}
                     className={`rounded-full px-4 py-1.5 text-sm whitespace-nowrap transition ${
                       category === c ? "bg-[color:var(--s-accent)] font-semibold text-white" : "border border-[color:var(--s-line)]"
                     }`}
@@ -336,7 +346,7 @@ export function ShopSection({
               visible.length === 1 && !left ? "mx-auto max-w-xs grid-cols-1" : visible.length === 2 && !left ? "mx-auto max-w-xl grid-cols-2" : GRID[layout.mobileColumns][layout.columns]
             }`}
           >
-            {visible.map((p) => {
+            {visible.slice(0, shown).map((p) => {
               const off = discount(p);
               return (
                 <article
@@ -370,6 +380,17 @@ export function ShopSection({
                 </article>
               );
             })}
+          </div>
+        )}
+        {visible.length > shown && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + 48)}
+              className="rounded-[var(--s-radius)] border border-[color:var(--s-line)] px-6 py-2.5 font-semibold hover:border-[color:var(--s-accent)]"
+            >
+              Ko&apos;proq ko&apos;rsatish ({visible.length - shown})
+            </button>
           </div>
         )}
       </div>

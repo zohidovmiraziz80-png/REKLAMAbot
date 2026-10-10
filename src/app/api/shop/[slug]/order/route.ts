@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { decryptSecret } from "@/lib/crypto";
+import { pushOrderToBito } from "@/lib/integrations/bito-sync";
 import { normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
 import { ORDER_COLUMNS, notifyNewOrder, type OrderRow } from "@/lib/shop/notify";
@@ -14,6 +15,7 @@ import { verifyInitData, type WebAppUser } from "@/lib/telegram/webapp";
  */
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const body = z.object({
   items: z
@@ -152,6 +154,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     db.from("shop_settings").select("order_thanks").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
   if (order) await notifyNewOrder(db, order as OrderRow, (settings?.order_thanks as string) || undefined);
+
+  // Bito ulangan bo'lsa — javobdan keyin fonda sotuv buyurtmasi yaratiladi
+  after(async () => {
+    try {
+      await pushOrderToBito(db, result.id);
+    } catch (err) {
+      console.error("Bito'ga yuborilmadi:", err instanceof Error ? err.message : "noma'lum");
+    }
+  });
 
   return NextResponse.json({ ok: true, number: result.number, total: result.total, telegram: !!tgUser });
 }

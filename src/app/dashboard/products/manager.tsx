@@ -59,6 +59,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
+  const [shown, setShown] = useState(100);
 
   const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))].sort(), [products]);
   const visible = products.filter(
@@ -124,7 +125,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
           <p className="px-4 py-10 text-center text-muted">Hech narsa topilmadi</p>
         ) : (
           <ul className="divide-y divide-line">
-            {visible.map((p) => (
+            {visible.slice(0, shown).map((p) => (
               <ProductRow
                 key={p.id}
                 product={p}
@@ -134,6 +135,11 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
               />
             ))}
           </ul>
+        )}
+        {visible.length > shown && (
+          <button type="button" onClick={() => setShown((n) => n + 100)} className="w-full border-t border-line py-3 text-sm font-medium text-brand-600 hover:bg-surface">
+            Yana ko&apos;rsatish ({visible.length - shown})
+          </button>
         )}
       </div>
 
@@ -186,6 +192,7 @@ function ProductRow({
       <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
         <p className="truncate font-semibold">{p.name}</p>
         <p className="truncate text-sm text-muted">
+          {p.external_source === "bito" && <span className="mr-1.5 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700">Bito</span>}
           {p.category || "Kategoriyasiz"}
           {p.stock !== null && <> · qoldiq: {p.stock === 0 ? <span className="text-red-600">tugagan</span> : p.stock}</>}
         </p>

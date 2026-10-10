@@ -17,7 +17,7 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from "@/lib/shop/format";
-import { updateOrderAction } from "./actions";
+import { retryOrderSyncAction, updateOrderAction } from "./actions";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-accent-50 text-accent-600",
@@ -229,6 +229,30 @@ function OrderCard({ order: o, open, onToggle, onChange }: { order: Order; open:
               </button>
             )}
             {o.chat_id && o.status !== "cancelled" && <p className="text-xs text-muted">Holat o&apos;zgarsa, mijozga Telegram&apos;da xabar boradi.</p>}
+            {o.external_ids?.bito ? (
+              <p className="rounded-md bg-emerald-50 px-2 py-1.5 text-xs text-emerald-800">
+                📊 Bito&apos;ga yuborildi{o.external_ids.bito_number ? ` · №${o.external_ids.bito_number}` : ""}
+              </p>
+            ) : o.sync_error ? (
+              <div className="space-y-1.5 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700">
+                <p>{o.sync_error}</p>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      setError(null);
+                      const r = await retryOrderSyncAction(o.id);
+                      if (r.ok) onChange({ sync_error: null, external_ids: { ...o.external_ids, bito: "ok" } });
+                      else setError(r.error);
+                    })
+                  }
+                  className="rounded bg-white px-2 py-1 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  Qayta yuborish
+                </button>
+              </div>
+            ) : null}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>

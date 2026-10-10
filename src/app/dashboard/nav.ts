@@ -17,7 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { slug: "products", label: "Mahsulotlar" },
   { slug: "orders", label: "Buyurtmalar" },
   { slug: "customers", label: "Mijozlar" },
-  { slug: "integrations", label: "Integratsiyalar", soon: true, description: "Bito, Yandex Delivery, BTS, Fargo, Payme, Click, Multicard, Eskiz SMS, AmoCRM / Bitrix24." },
+  { slug: "integrations", label: "Integratsiyalar" },
   { slug: "plan", label: "Tarif" },
   { slug: "settings", label: "Sozlamalar", soon: true, description: "Profil, workspace, jamoa a'zolari va tarif." },
 ];

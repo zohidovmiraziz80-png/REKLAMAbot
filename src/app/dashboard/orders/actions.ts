@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
+import { retryOrderSync } from "@/actions/integrations";
 import { saveShopSettings, updateOrder } from "@/actions/shop";
 
 export async function updateOrderAction(input: { id: string; status?: string; paymentStatus?: string; adminNote?: string }) {
@@ -13,5 +14,11 @@ export async function updateOrderAction(input: { id: string; status?: string; pa
 export async function saveShopSettingsAction(input: unknown) {
   const r = await runAction(saveShopSettings, input);
   if (r.ok) revalidatePath("/dashboard/orders/settings");
+  return r;
+}
+
+export async function retryOrderSyncAction(orderId: string) {
+  const r = await runAction(retryOrderSync, { orderId });
+  revalidatePath("/dashboard/orders");
   return r;
 }

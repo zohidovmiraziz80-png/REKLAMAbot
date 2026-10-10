@@ -1,5 +1,14 @@
 import type { ActionDefinition } from "./define";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
+import {
+  connectBito,
+  disconnectIntegration,
+  getBitoSetup,
+  listIntegrations,
+  retryOrderSync,
+  saveBitoSettings,
+  syncBitoNow,
+} from "./integrations";
 import { getMyPlan } from "./plans";
 import { createProject, deleteProject, listProjects, renameProject } from "./projects";
 import {
@@ -61,6 +70,13 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   updateCustomer,
   getShopSettings,
   saveShopSettings,
+  listIntegrations,
+  connectBito,
+  getBitoSetup,
+  saveBitoSettings,
+  syncBitoNow,
+  retryOrderSync,
+  disconnectIntegration,
 ];
 
 export function getAction(name: string) {

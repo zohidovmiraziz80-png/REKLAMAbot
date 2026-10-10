@@ -13,6 +13,9 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
  * Manzillar: /s/<slug>, <slug>.<asosiy-domen> yoki o'z domeni (middleware shu yerga yo'naltiradi).
  */
 
+// Bito sinxronlash javobdan keyin fonda ishlashi mumkin
+export const maxDuration = 300;
+
 type Params = Promise<{ slug: string; page?: string[] }>;
 
 const loadSite = cache(async (slug: string) => {

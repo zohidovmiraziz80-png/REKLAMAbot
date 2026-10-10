@@ -35,15 +35,22 @@ export const listProducts = defineAction({
   description: "Workspace'dagi barcha mahsulotlar ro'yxati (nomi, narxi, qoldiq, kategoriya).",
   input: z.object({}),
   handler: async (ctx): Promise<Product[]> => {
-    const { data, error } = await ctx.supabase
-      .from("products")
-      .select(PRODUCT_COLUMNS)
-      .eq("workspace_id", ctx.workspaceId)
-      .order("sort", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    if (error) throw new ActionError("internal", "Mahsulotlarni yuklab bo'lmadi");
-    return (data ?? []) as Product[];
+    // Supabase bir so'rovda ko'pi bilan 1000 qator qaytaradi — sahifalab olamiz (Bito'dan minglab mahsulot bo'lishi mumkin)
+    const all: Product[] = [];
+    for (let from = 0; from < 20000; from += 1000) {
+      const { data, error } = await ctx.supabase
+        .from("products")
+        .select(PRODUCT_COLUMNS)
+        .eq("workspace_id", ctx.workspaceId)
+        .order("sort", { ascending: true })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + 999);
+      if (error) throw new ActionError("internal", "Mahsulotlarni yuklab bo'lmadi");
+      all.push(...((data ?? []) as Product[]));
+      if (!data || data.length < 1000) break;
+    }
+    return all;
   },
 });
 
@@ -151,11 +158,13 @@ export type Order = {
   total: number;
   admin_note: string;
   chat_id: number | null;
+  external_ids: Record<string, string>;
+  sync_error: string | null;
   created_at: string;
 };
 
 const ORDER_COLUMNS =
-  "id, number, source, customer_id, customer_name, phone, address, comment, delivery_method, payment_method, payment_status, status, items, subtotal, delivery_price, total, admin_note, chat_id, created_at";
+  "id, number, source, customer_id, customer_name, phone, address, comment, delivery_method, payment_method, payment_status, status, items, subtotal, delivery_price, total, admin_note, chat_id, external_ids, sync_error, created_at";
 
 export const listOrders = defineAction({
   name: "listOrders",

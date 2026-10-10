@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { maybeAutoSyncBito } from "@/lib/integrations/bito-sync";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ShopData } from "./types";
 
@@ -12,21 +14,40 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
   } catch {
     return null;
   }
-  const [{ data: products }, { data: s }] = await Promise.all([
-    db
-      .from("products")
-      .select("id, name, description, price, old_price, category, image_url, emoji, stock")
-      .eq("workspace_id", workspaceId)
-      .eq("is_active", true)
-      .order("sort", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(500),
+  const loadProducts = async () => {
+    const rows: Record<string, unknown>[] = [];
+    for (let from = 0; from < 3000; from += 1000) {
+      const { data } = await db
+        .from("products")
+        .select("id, name, description, price, old_price, category, image_url, emoji, stock")
+        .eq("workspace_id", workspaceId)
+        .eq("is_active", true)
+        .order("sort", { ascending: true })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + 999);
+      rows.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    return rows;
+  };
+  const [products, { data: s }] = await Promise.all([
+    loadProducts(),
     db
       .from("shop_settings")
       .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order")
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
   ]);
+
+  // Bito ulangan bo'lsa — narx va qoldiq 3 soatdan eski bo'lsa, javobdan keyin fonda yangilanadi
+  if (!opts.preview) {
+    try {
+      after(() => maybeAutoSyncBito(db, workspaceId));
+    } catch {
+      // after() faqat so'rov ichida ishlaydi
+    }
+  }
 
   return {
     slug,
