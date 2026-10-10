@@ -39,7 +39,14 @@ export type BotRuntime = {
   token: string;
 };
 
-type ChatState = { step?: "phone" | "message" | "login"; phone?: string; token?: string };
+type ChatState = {
+  step?: "phone" | "message" | "login";
+  phone?: string;
+  token?: string;
+  startedAt?: number;
+  /** Saytga kirish tasdiqlandi — sayt shu kod bilan sessiya oladi */
+  login?: { n: string; phone: string; name: string; at: number };
+};
 
 const CANCEL = "❌ Bekor qilish";
 const SHARE_PHONE = "📱 Raqamni yuborish";
@@ -221,12 +228,7 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     await setState({});
     const login = payload.match(/^login_([a-f0-9]{24})$/);
     if (login) {
-      const { data: row } = await db.from("customer_logins").select("status, expires_at").eq("token", login[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
-      if (!row || row.status !== "pending" || new Date(row.expires_at as string).getTime() < Date.now()) {
-        await send("⏰ Kirish havolasi eskirgan. Saytda «Kirish» tugmasini qayta bosing.", menu());
-        return;
-      }
-      await setState({ step: "login", token: login[1] });
+      await setState({ step: "login", token: login[1], startedAt: Date.now() });
       await send("🔐 Saytga kirish uchun telefon raqamingizni tasdiqlang — pastdagi tugmani bosing 👇", {
         keyboard: [[{ text: LOGIN_SHARE, request_contact: true }], [{ text: CANCEL }]],
         resize_keyboard: true,
@@ -261,20 +263,12 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     }
     const raw = msg.contact.phone_number.startsWith("+") ? msg.contact.phone_number : `+${msg.contact.phone_number}`;
     const phone = normalizeUzPhone(raw) ?? raw.replace(/[^\d+]/g, "").slice(0, 16);
-    const { data: updated } = await db
-      .from("customer_logins")
-      .update({ status: "confirmed", phone, chat_id: chatId, name })
-      .eq("token", state.token)
-      .eq("workspace_id", bot.workspace_id)
-      .eq("status", "pending")
-      .gt("expires_at", new Date().toISOString())
-      .select("token")
-      .maybeSingle();
-    await setState({});
-    if (!updated) {
+    if (!state.startedAt || Date.now() - state.startedAt > 15 * 60 * 1000) {
+      await setState({});
       await send("⏰ Kirish havolasi eskirgan. Saytda «Kirish» tugmasini qayta bosing.", menu());
       return;
     }
+    await setState({ login: { n: state.token, phone, name: name ?? "", at: Date.now() } });
     // Mijozlar bazasi (CRM): yangi bo'lsa qo'shamiz, bor bo'lsa Telegram'ni bog'laymiz
     const { data: existing } = await db.from("customers").select("id, name").eq("workspace_id", bot.workspace_id).eq("phone", phone).maybeSingle();
     if (existing) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 
 /**
@@ -78,20 +79,27 @@ function openTelegram(url: string) {
 
 const btnAccent = "rounded-[var(--s-radius)] bg-[color:var(--s-accent)] font-semibold text-white transition hover:brightness-110 disabled:opacity-50";
 
-export function AccountButton({ slug, raised }: { slug: string; raised: boolean }) {
+export function AccountButton({ slug, placement = "header", dark = false }: { slug: string; placement?: "header" | "preview"; dark?: boolean }) {
   const saved = useCustomer(slug);
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  const label = saved ? (saved.customer.name || "Kabinet").split(" ")[0] : "Kirish";
+  // Modal sarlavha (backdrop-blur) ichida qolib ketmasligi uchun sayt ildiziga chiqariladi — mavzu ranglari saqlanadi
+  const root = open && ref.current ? ((ref.current.closest("[data-site-root]") as HTMLElement | null) ?? document.body) : null;
   return (
     <>
       <button
+        ref={ref}
         type="button"
-        onClick={() => setOpen(true)}
-        className={`fixed left-3 z-40 flex items-center gap-2 rounded-full border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-4 py-2.5 text-sm font-semibold text-[color:var(--s-text)] shadow-lg transition-[bottom] ${raised ? "bottom-20" : "bottom-4"}`}
+        onClick={() => placement === "header" && setOpen(true)}
+        className={`ml-1 flex items-center gap-1.5 rounded-full px-4 py-1.5 font-semibold whitespace-nowrap ${saved ? (dark ? "bg-white/15 text-white" : "bg-[color:var(--s-surface)] text-[color:var(--s-text)]") : "bg-[color:var(--s-accent)] text-white"}`}
       >
-        <span aria-hidden>👤</span>
-        {saved ? (saved.customer.name || "Kabinet").split(" ")[0] : "Kirish"}
+        <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
+          <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4.42 0-8 2.24-8 5v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1c0-2.76-3.58-5-8-5z" />
+        </svg>
+        {label}
       </button>
-      {open && <AccountModal slug={slug} onClose={() => setOpen(false)} />}
+      {open && root && createPortal(<AccountModal slug={slug} onClose={() => setOpen(false)} />, root)}
     </>
   );
 }

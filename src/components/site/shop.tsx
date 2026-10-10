@@ -4,7 +4,7 @@ import Script from "next/script";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { formatMoney } from "@/lib/shop/format";
 import type { PublicProduct, ShopData } from "@/lib/shop/types";
-import { AccountButton, useCustomer } from "./account";
+import { useCustomer } from "./account";
 
 /**
  * Saytdagi jonli do'kon: katalog, savat va buyurtma berish.
@@ -487,8 +487,6 @@ export function ShopSection({
           </button>
         </div>
       )}
-
-      {isOwner && settings.loginEnabled && open === null && !detail && !shop.embedded && <AccountButton slug={shop.slug} raised={count > 0} />}
 
       {isOwner && open && !shop.embedded && (
         <CartDrawer

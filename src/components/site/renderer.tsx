@@ -2,6 +2,7 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { DEFAULT_BLOCK_STYLE, type Block, type BlockStyle, type Site, type SitePage } from "@/lib/site/schema";
 import { instagramUrl, phoneUrl, safeHref, telegramUrl } from "@/lib/site/safe";
 import type { ShopData } from "@/lib/shop/types";
+import { AccountButton } from "./account";
 import { BlockScope, E, EditProvider } from "./editable";
 import { ShopPlaceholder, ShopSection, type ShopLayout } from "./shop";
 
@@ -737,7 +738,20 @@ function EditFrame({ id, index, total, editing, children }: { id: string; index:
   );
 }
 
-function SiteHeader({ site, page, basePath, contactHref }: { site: Site; page: SitePage; basePath: string; contactHref?: string }) {
+function SiteHeader({
+  site,
+  page,
+  basePath,
+  contactHref,
+  login,
+}: {
+  site: Site;
+  page: SitePage;
+  basePath: string;
+  contactHref?: string;
+  /** Mijoz kabineti yoqilgan bo'lsa — "Bog'lanish" o'rniga "Kirish" tugmasi */
+  login?: { slug: string; preview: boolean };
+}) {
   const header = site.header;
   const showNav = header?.showNav ?? true;
   const ctaText = header?.ctaText ? header.ctaText : contactHref ? "Bog'lanish" : "";
@@ -767,8 +781,9 @@ function SiteHeader({ site, page, basePath, contactHref }: { site: Site; page: S
           </a>
         ))
       : null;
-  const cta =
-    ctaText && ctaHref ? (
+  const cta = login ? (
+    <AccountButton slug={login.slug} placement={login.preview ? "preview" : "header"} dark={dark} />
+  ) : ctaText && ctaHref ? (
       <a href={ctaHref} className="ml-1 rounded-full bg-[color:var(--s-accent)] px-4 py-1.5 font-semibold whitespace-nowrap text-white">
         {ctaText}
       </a>
@@ -793,10 +808,10 @@ function SiteHeader({ site, page, basePath, contactHref }: { site: Site; page: S
     >
       <div className={`${container} flex h-16 items-center justify-between gap-4`}>
         {logo}
-        <nav className="flex items-center gap-1 overflow-x-auto text-sm">
-          {links}
-          {cta}
-        </nav>
+        <div className="flex min-w-0 items-center gap-1 text-sm">
+          <nav className="flex min-w-0 items-center gap-1 overflow-x-auto">{links}</nav>
+          <div className="shrink-0">{cta}</div>
+        </div>
       </div>
     </header>
   );
@@ -894,9 +909,15 @@ export function SiteRenderer({
   const contactHref = contact ? (page.blocks.includes(contact) ? "#aloqa" : `${basePath}/${site.pages.find((p) => p.blocks.includes(contact))?.slug}#aloqa`) : undefined;
 
   const body = (
-    <div style={themeVars(site)} className="min-h-full">
+    <div style={themeVars(site)} className="min-h-full" data-site-root>
       <style>{BASE_CSS}</style>
-      <SiteHeader site={site} page={page} basePath={basePath} contactHref={contactHref} />
+      <SiteHeader
+        site={site}
+        page={page}
+        basePath={basePath}
+        contactHref={contactHref}
+        login={shop?.settings.loginEnabled ? { slug: shop.slug, preview: !!shop.embedded || !!editing } : undefined}
+      />
 
       <main>
         {page.blocks.map((block, i) => {
