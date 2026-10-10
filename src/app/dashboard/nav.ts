@@ -20,7 +20,6 @@ export const NAV_ITEMS: NavItem[] = [
   { slug: "integrations", label: "Integratsiyalar" },
   { slug: "plan", label: "Tarif" },
   { slug: "marketing", label: "Marketing", soon: true, description: "Promo-kodlar, chegirmalar va mijozlarga ommaviy xabarlar (Telegram, SMS)." },
-  { slug: "metrics", label: "Metrikalar", soon: true, description: "Savdo, buyurtmalar, eng ko'p sotilgan mahsulotlar va mijozlar statistikasi." },
   { slug: "whatsapp", label: "WhatsApp", soon: true, description: "WhatsApp orqali buyurtma qabul qilish va mijozlarga xabar yuborish." },
   { slug: "chat", label: "Chat", soon: true, description: "Sayt, Telegram va WhatsApp'dagi mijoz xabarlari bitta oynada." },
   { slug: "ai-consultant", label: "SI konsultant", soon: true, description: "Saytda mijozlarga mahsulot tanlashda yordam beradigan sun'iy intellekt." },

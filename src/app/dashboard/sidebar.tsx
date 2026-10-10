@@ -67,7 +67,7 @@ function groups(newOrders: number): Group[] {
         },
         { label: "Mijozlar", icon: "customers", href: "/dashboard/customers" },
         { label: "Marketing", icon: "marketing", href: "/dashboard/marketing", soon: true },
-        { label: "Metrikalar", icon: "metrics", href: "/dashboard/metrics", soon: true },
+        { label: "Metrikalar", icon: "metrics", href: "/dashboard/metrics" },
       ],
     },
     {
