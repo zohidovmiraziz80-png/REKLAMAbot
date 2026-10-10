@@ -1,5 +1,6 @@
 import type { ActionDefinition } from "./define";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, connectBts, getBtsSetup, saveBtsSettings, connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
+import { addMember, changePassword, getSettings, removeMember, renameWorkspace, saveProfile, updateMemberRole } from "./settings";
 import { getCardPaySetup, saveCardPaySettings, unlinkPayChannel } from "./card-pay";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
 import {
@@ -97,6 +98,13 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   btsSend,
   btsTrack,
   btsCancelOrder,
+  getSettings,
+  renameWorkspace,
+  saveProfile,
+  changePassword,
+  addMember,
+  updateMemberRole,
+  removeMember,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,

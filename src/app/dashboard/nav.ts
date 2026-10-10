@@ -26,9 +26,7 @@ export const NAV_ITEMS: NavItem[] = [
   { slug: "ai-consultant", label: "SI konsultant", soon: true, description: "Saytda mijozlarga mahsulot tanlashda yordam beradigan sun'iy intellekt." },
   { slug: "ai-telegram", label: "AI Telegram", soon: true, description: "Telegram botda mijoz savollariga sun'iy intellekt javob beradi." },
   { slug: "payments", label: "To'lovlar", soon: true, description: "Payme, Click va Multicard orqali onlayn to'lov." },
-  { slug: "staff", label: "Xodimlar", soon: true, description: "Xodimlarni qo'shish va ularning huquqlarini boshqarish." },
   { slug: "app", label: "Dastur", soon: true, description: "Do'konni telefondan boshqarish uchun mobil ilova." },
-  { slug: "settings", label: "Sozlamalar", soon: true, description: "Profil, workspace, jamoa a'zolari va tarif." },
 ];
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {

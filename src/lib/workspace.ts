@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 export type WorkspaceRole = "owner" | "admin" | "member";
 
@@ -8,29 +9,36 @@ export type ActiveWorkspace = {
   role: WorkspaceRole;
 };
 
-/**
- * Foydalanuvchining joriy workspace'ini qaytaradi.
- * Hozircha birinchi (shaxsiy) workspace olinadi; keyin workspace almashtirish qo'shiladi.
- */
-export async function getActiveWorkspace(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<ActiveWorkspace | null> {
-  const { data, error } = await supabase
+/** Tanlangan workspace saqlanadigan cookie (xodim bir nechta do'konga a'zo bo'lishi mumkin) */
+export const WORKSPACE_COOKIE = "mx-ws";
+
+type Row = { role: string; workspaces: { id: string; name: string } | { id: string; name: string }[] | null };
+
+function toWs(r: Row): ActiveWorkspace | null {
+  const ws = Array.isArray(r.workspaces) ? r.workspaces[0] : r.workspaces;
+  return ws ? { id: ws.id, name: ws.name, role: r.role as WorkspaceRole } : null;
+}
+
+/** Foydalanuvchi a'zo bo'lgan barcha workspace'lar */
+export async function listMyWorkspaces(supabase: SupabaseClient, userId: string): Promise<ActiveWorkspace[]> {
+  const { data } = await supabase
     .from("workspace_members")
     .select("role, workspaces ( id, name )")
     .eq("user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
+  return ((data ?? []) as unknown as Row[]).map(toWs).filter((w): w is ActiveWorkspace => !!w);
+}
 
-  if (error || !data) return null;
-
-  const ws = (Array.isArray(data.workspaces) ? data.workspaces[0] : data.workspaces) as
-    | { id: string; name: string }
-    | null
-    | undefined;
-  if (!ws) return null;
-
-  return { id: ws.id, name: ws.name, role: data.role as WorkspaceRole };
+/**
+ * Foydalanuvchining joriy workspace'i: cookie'da tanlangani (a'zo bo'lsa), bo'lmasa birinchisi (shaxsiy).
+ */
+export async function getActiveWorkspace(supabase: SupabaseClient, userId: string): Promise<ActiveWorkspace | null> {
+  let preferred: string | undefined;
+  try {
+    preferred = (await cookies()).get(WORKSPACE_COOKIE)?.value;
+  } catch {
+    // so'rovdan tashqarida cookie yo'q
+  }
+  const all = await listMyWorkspaces(supabase, userId);
+  return (preferred && all.find((w) => w.id === preferred)) || all[0] || null;
 }

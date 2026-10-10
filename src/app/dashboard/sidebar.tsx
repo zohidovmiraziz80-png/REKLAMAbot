@@ -93,6 +93,7 @@ function groups(newOrders: number): Group[] {
           label: "Sozlamalar",
           icon: "settings",
           children: [
+            { label: "Umumiy", href: "/dashboard/settings" },
             { label: "Do'kon sozlamalari", href: "/dashboard/orders/settings" },
             { label: "Integratsiyalar", href: "/dashboard/integrations" },
           ],
@@ -108,7 +109,7 @@ function groups(newOrders: number): Group[] {
             { label: "MIXBOT tarifi", href: "/dashboard/plan" },
           ],
         },
-        { label: "Xodimlar", icon: "staff", href: "/dashboard/staff", soon: true },
+        { label: "Xodimlar", icon: "staff", href: "/dashboard/settings#staff" },
         { label: "Dastur", icon: "app", href: "/dashboard/app", soon: true },
       ],
     },
