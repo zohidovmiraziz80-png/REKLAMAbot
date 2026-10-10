@@ -85,43 +85,65 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
 
   // Bir xabarni ikki marta hisoblamaslik uchun
   const externalId = `${post.chat.id}:${post.message_id}`;
-  const { data: existing } = await db.from("payment_transactions").select("id").eq("provider", "card").eq("external_id", externalId).maybeSingle();
+  const { data: existing } = await db.from("payment_transactions").select("id").in("provider", ["card", "click"]).eq("external_id", externalId).maybeSingle();
   if (existing) return;
 
   const since = new Date(Date.now() - MATCH_WINDOW_HOURS * 3600 * 1000).toISOString();
+  type Match = { id: string; number: number; total: number; payment_method: string };
+  let matches: Match[] = [];
+  // 1) Xabarda buyurtma id bo'lsa (Click to'lovida transaction_param) — aniq moslik
+  if (parsed.orderRef) {
+    const { data } = await db
+      .from("orders")
+      .select("id, number, total, payment_method")
+      .eq("workspace_id", bot.workspace_id)
+      .eq("id", parsed.orderRef)
+      .eq("payment_status", "unpaid")
+      .neq("status", "cancelled")
+      .maybeSingle();
+    if (data) matches = [data as unknown as Match];
+  }
+  // 2) Summa bo'yicha: kartaga o'tkazma (noyob summa) yoki Click buyurtmalari
   const base = () =>
     db
       .from("orders")
-      .select("id, number, total, pay_amount")
+      .select("id, number, total, payment_method")
       .eq("workspace_id", bot.workspace_id)
-      .eq("payment_method", "card")
+      .in("payment_method", ["card", "click"])
       .eq("payment_status", "unpaid")
       .neq("status", "cancelled")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5);
-  let { data: matches } = await base().eq("pay_amount", parsed.amount);
-  // Mijoz yaxlitlab o'tkazgan bo'lsa — jami summa bo'yicha
-  if (!matches?.length) ({ data: matches } = await base().eq("total", parsed.amount));
+  if (!matches.length) {
+    const { data } = await base().eq("pay_amount", parsed.amount);
+    matches = (data ?? []) as unknown as Match[];
+  }
+  // Mijoz yaxlitlab o'tkazgan bo'lsa yoki Click buyurtmasi — jami summa bo'yicha
+  if (!matches.length) {
+    const { data } = await base().eq("total", parsed.amount);
+    matches = (data ?? []) as unknown as Match[];
+  }
 
   const reply = (t: string) =>
     tg(bot.token, "sendMessage", { chat_id: post.chat.id, text: t, reply_parameters: { message_id: post.message_id, allow_sending_without_reply: true } }).catch(
       () => undefined,
     );
 
-  if (matches?.length === 1) {
+  if (matches.length === 1) {
     const o = matches[0];
+    const provider = o.payment_method === "click" ? "click" : "card";
     await db.from("payment_transactions").insert({
       workspace_id: bot.workspace_id,
       order_id: o.id,
-      provider: "card",
+      provider,
       external_id: externalId,
       amount: parsed.amount,
       state: 2,
       perform_time: Date.now(),
       raw: { text: text.slice(0, 1000) },
     });
-    await markOrderPaid(db, o.id as string, "card");
+    await markOrderPaid(db, o.id, provider);
     await reply(`✅ №${o.number} buyurtma to'landi deb belgilandi (${formatMoney(parsed.amount)})`);
     return;
   }
@@ -135,7 +157,7 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
     state: 1,
     raw: { text: text.slice(0, 1000) },
   });
-  if (!matches?.length) {
+  if (!matches.length) {
     await notifyOwners(db, bot.workspace_id, `💳 Kartaga ${formatMoney(parsed.amount)} tushdi, lekin shu summadagi to'lanmagan buyurtma topilmadi.`);
   } else {
     await notifyOwners(

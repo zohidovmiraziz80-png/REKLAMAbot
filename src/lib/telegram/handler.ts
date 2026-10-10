@@ -161,6 +161,13 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
 /** Guruhda: "/ulash KOD" — buyurtmalar shu guruhga tushadigan bo'ladi */
 async function handleGroupMessage(db: SupabaseClient, bot: BotRuntime, msg: TgMessage) {
   const text = (msg.text ?? "").trim();
+  if (/^\/tolov(?:@\w+)?\b/i.test(text)) {
+    await tg(bot.token, "sendMessage", {
+      chat_id: msg.chat.id,
+      text: "ℹ️ Telegram qoidasi bo'yicha bot guruhda boshqa botlarning (masalan Click bot) xabarlarini ko'ra olmaydi. To'lov xabarlari uchun KANAL oching, Click bot va meni kanalga administrator qiling, so'ng kanalda shu buyruqni yozing.",
+    }).catch(() => undefined);
+    return;
+  }
   const mm = text.match(/^\/ulash(?:@\w+)?\s+([a-z0-9]{6,32})$/i);
   if (!mm) return;
   const { data: s } = await db.from("shop_settings").select("group_link_code").eq("workspace_id", bot.workspace_id).maybeSingle();

@@ -44,12 +44,21 @@ export function parseMoney(raw: string): number | null {
 
 const MONEY = /([+＋]?)\s*(\d{1,3}(?:[   .,']\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(uzs|sum|so['‘’`]?m|сум|сўм)?/gi;
 
-export type ParsedPayment = { amount: number; incoming: boolean };
+export type ParsedPayment = { amount: number; incoming: boolean; orderRef: string | null };
 
-export function parsePaymentSms(text: string): ParsedPayment | null {
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+/** To'lov tizimi boti xabari (Click, Payme, Multicard): "Оплата"/"To'lov" bu yerda kirimni bildiradi */
+const MERCHANT_BOT = /click|payme|paycom|multicard|uzum/i;
+const MERCHANT_PAID = ["оплата", "oplata", "to'lov", "tolov", "to‘lov", "успешн", "muvaffaqiyatli", "оплачен", "to'landi", "paid", "payment"];
+
+export function parsePaymentSms(rawText: string): ParsedPayment | null {
+  // Buyurtma id (Click'da transaction_param sifatida ketadi) — topilsa summadan oldin ishlatiladi
+  const orderRef = rawText.match(UUID_RE)?.[0]?.toLowerCase() ?? null;
+  const text = rawText.replace(new RegExp(UUID_RE.source, "gi"), " ");
   const lower = text.toLowerCase();
-  const isOut = OUTGOING.some((w) => lower.includes(w));
-  const isIn = INCOMING.some((w) => lower.includes(w)) || /(^|\s)[+＋]\s*\d/.test(text);
+  const merchantPaid = MERCHANT_BOT.test(lower) && MERCHANT_PAID.some((w) => lower.includes(w)) && !/qaytar|возврат|отмен|bekor/.test(lower);
+  const isOut = !merchantPaid && OUTGOING.some((w) => lower.includes(w));
+  const isIn = merchantPaid || INCOMING.some((w) => lower.includes(w)) || /(^|\s)[+＋]\s*\d/.test(text);
 
   // Balans qatorlarini olib tashlaymiz
   const lines = text
@@ -84,5 +93,5 @@ export function parsePaymentSms(text: string): ParsedPayment | null {
   if (!candidates.length) return null;
   const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
   if (best.score === 0) return null;
-  return { amount: best.amount, incoming: isIn && !isOut };
+  return { amount: best.amount, incoming: isIn && !isOut, orderRef };
 }
