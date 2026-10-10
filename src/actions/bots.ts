@@ -7,7 +7,10 @@ import { botConfigSchema, defaultBotConfig, type BotConfig } from "@/lib/telegra
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
 
-export const REQUEST_STATUSES = ["new", "in_progress", "done", "cancelled"] as const;
+/** Vercel'ning barcha domenlariga xizmat qiluvchi doimiy IP (Vercel hujjatlaridagi A yozuvi) */
+const VERCEL_EDGE_IP = "76.76.21.21";
+
+export const REQUEST_STATUSES =["new", "in_progress", "done", "cancelled"] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
 export type BotRequest = {
@@ -146,16 +149,25 @@ export const connectBot = defineAction({
       .maybeSingle();
 
     const webhookSecret = randomToken(32);
+    const webhook = {
+      url: `${getSiteUrl()}/api/telegram/${project.id}`,
+      secret_token: webhookSecret,
+      allowed_updates: ["message"],
+      drop_pending_updates: true,
+      max_connections: 20,
+    };
     try {
-      await tg(input.token, "setWebhook", {
-        url: `${getSiteUrl()}/api/telegram/${project.id}`,
-        secret_token: webhookSecret,
-        allowed_updates: ["message"],
-        drop_pending_updates: true,
-        max_connections: 20,
-      });
+      await tg(input.token, "setWebhook", webhook);
     } catch (err) {
-      telegramError(err);
+      // Telegram serverlari ba'zan *.vercel.app manzilini DNS orqali topa olmaydi —
+      // bunday holatda Vercel'ning doimiy IP manzilini to'g'ridan-to'g'ri beramiz.
+      const dnsIssue = err instanceof TelegramError && /resolve host|bad webhook/i.test(err.message);
+      if (!dnsIssue) telegramError(err);
+      try {
+        await tg(input.token, "setWebhook", { ...webhook, ip_address: VERCEL_EDGE_IP });
+      } catch (err2) {
+        telegramError(err2);
+      }
     }
     try {
       await tg(input.token, "setMyCommands", { commands: [{ command: "start", description: "Bosh menyu" }] });
