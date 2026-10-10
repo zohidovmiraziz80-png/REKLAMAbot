@@ -1,10 +1,19 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { getActiveWorkspace } from "@/lib/workspace";
 import { getWorkspacePlan } from "@/lib/plans";
+import { InstallApp } from "./install-app";
 import { Sidebar } from "./sidebar";
+
+/** Faqat boshqaruv paneli telefonga ilova sifatida o'rnatiladi (mijoz saytlariga ta'sir qilmaydi) */
+export const metadata: Metadata = {
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "MIXBOT", statusBarStyle: "default" },
+  icons: { apple: "/apple-touch-icon.png" },
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -34,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           isAdmin={isAdmin === true}
         />
       </Suspense>
+      <InstallApp />
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
         {plan && plan.status !== "active" && (
           <div
