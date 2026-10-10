@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { formatMoney } from "@/lib/shop/format";
 import type { PublicProduct, ShopData } from "@/lib/shop/types";
 
@@ -46,6 +46,21 @@ function telegramLink(): { bot: string; chat: string } | null {
 }
 
 type Cart = Record<string, number>;
+
+type CartStore = { cart: Cart; listeners: Set<() => void>; owners: string[]; loaded: boolean; openRequest: number };
+const EMPTY_CART: Cart = {};
+const stores = new Map<string, CartStore>();
+function getStore(key: string): CartStore {
+  let s = stores.get(key);
+  if (!s) {
+    s = { cart: {}, listeners: new Set(), owners: [], loaded: false, openRequest: 0 };
+    stores.set(key, s);
+  }
+  return s;
+}
+function notify(s: CartStore) {
+  for (const l of [...s.listeners]) l();
+}
 
 function loadCart(slug: string): Cart {
   try {
@@ -117,38 +132,133 @@ function AddControl({ p, qty, canOrder, onChange }: { p: PublicProduct; qty: num
   );
 }
 
-export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopData; heading: string; subheading: string; anchor: string }) {
-  const { products, settings } = shop;
-  const [cart, setCart] = useState<Cart>({});
+/** Katalog blokining ko'rinish sozlamalari (tahrirlovchidan) */
+export type ShopLayout = {
+  category: string;
+  limit: number;
+  columns: "2" | "3" | "4";
+  mobileColumns: "1" | "2";
+  card: "border" | "shadow" | "flat";
+  ratio: "square" | "portrait" | "landscape";
+  showDescription: boolean;
+  showSearch: boolean;
+  align: "left" | "center";
+};
+
+const DEFAULT_LAYOUT: ShopLayout = {
+  category: "",
+  limit: 0,
+  columns: "4",
+  mobileColumns: "2",
+  card: "border",
+  ratio: "square",
+  showDescription: false,
+  showSearch: true,
+  align: "center",
+};
+
+const RATIO = { square: "aspect-square", portrait: "aspect-[4/5]", landscape: "aspect-[4/3]" } as const;
+const CARD = {
+  border: "border border-[color:var(--s-line)] hover:shadow-lg",
+  shadow: "shadow-md hover:shadow-xl",
+  flat: "",
+} as const;
+const GRID: Record<ShopLayout["mobileColumns"], Record<ShopLayout["columns"], string>> = {
+  "1": { "2": "grid-cols-1 sm:grid-cols-2", "3": "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3", "4": "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4" },
+  "2": { "2": "grid-cols-2", "3": "grid-cols-2 lg:grid-cols-3", "4": "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" },
+};
+
+export function ShopSection({
+  shop,
+  heading,
+  subheading,
+  anchor,
+  layout: layoutProp,
+}: {
+  shop: ShopData;
+  heading: string;
+  subheading: string;
+  anchor: string;
+  layout?: ShopLayout;
+}) {
+  const layout = layoutProp ?? DEFAULT_LAYOUT;
+  const settings = shop.settings;
+  // Blok faqat bitta kategoriyani ko'rsatishi mumkin (masalan "Atirgullar" bo'limi)
+  const products = useMemo(() => {
+    const list = layout.category ? shop.products.filter((p) => p.category === layout.category) : shop.products;
+    return layout.limit > 0 ? list.slice(0, layout.limit) : list;
+  }, [shop.products, layout.category, layout.limit]);
   const [category, setCategory] = useState<string>("");
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
 
-  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  // Savat butun sayt uchun bitta: sahifada bir nechta katalog bloki bo'lsa ham umumiy
+  const byId = useMemo(() => new Map(shop.products.map((p) => [p.id, p])), [shop.products]);
   const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))], [products]);
+  const storeKey = shop.embedded ? `embedded:${shop.slug}` : shop.slug;
+  const store = getStore(storeKey);
+  const cart = useSyncExternalStore(
+    (cb) => {
+      store.listeners.add(cb);
+      return () => store.listeners.delete(cb);
+    },
+    () => store.cart,
+    () => EMPTY_CART,
+  );
+  // Suzuvchi savat tugmasi va savat oynasini faqat birinchi katalog bloki ko'rsatadi
+  const myId = useId();
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    store.owners.push(myId);
+    const check = () => setIsOwner(store.owners[0] === myId);
+    store.listeners.add(check);
+    notify(store);
+    return () => {
+      store.owners = store.owners.filter((o) => o !== myId);
+      store.listeners.delete(check);
+      notify(store);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, myId]);
+
+  // Boshqa katalog blokidagi "Savatga o'tish" tugmasi savatni shu (birinchi) blokda ochadi
+  const lastOpen = useRef(store.openRequest);
+  useEffect(() => {
+    const onRequest = () => {
+      if (store.openRequest > lastOpen.current) {
+        lastOpen.current = store.openRequest;
+        if (store.owners[0] === myId) setOpen("cart");
+      }
+    };
+    store.listeners.add(onRequest);
+    return () => {
+      store.listeners.delete(onRequest);
+    };
+  }, [store, myId]);
 
   useEffect(() => {
-    if (shop.embedded) return;
+    if (shop.embedded || store.loaded) return;
+    store.loaded = true;
     telegramLink();
     const stored = loadCart(shop.slug);
     const clean: Cart = {};
-    for (const [id, q] of Object.entries(stored)) {
+    for (const [id, q2] of Object.entries(stored)) {
       const p = byId.get(id);
-      if (p && p.inStock && Number.isInteger(q) && q > 0) clean[id] = Math.min(q, p.maxQty);
+      if (p && p.inStock && Number.isInteger(q2) && q2 > 0) clean[id] = Math.min(q2, p.maxQty);
     }
-    setCart(clean);
-  }, [shop.slug, shop.embedded, byId]);
+    store.cart = clean;
+    notify(store);
+  }, [shop.slug, shop.embedded, byId, store]);
 
   function update(id: string, qty: number) {
-    setCart((c) => {
-      const next = { ...c };
-      if (qty <= 0) delete next[id];
-      else next[id] = Math.min(qty, byId.get(id)?.maxQty ?? 99);
-      if (!shop.embedded) saveCart(shop.slug, next);
-      return next;
-    });
+    const next = { ...store.cart };
+    if (qty <= 0) delete next[id];
+    else next[id] = Math.min(qty, byId.get(id)?.maxQty ?? 99);
+    store.cart = next;
+    if (!shop.embedded) saveCart(shop.slug, next);
+    notify(store);
     webApp()?.HapticFeedback?.impactOccurred("light");
   }
 
@@ -159,7 +269,9 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
   const subtotal = lines.reduce((s, l) => s + l.p.price * l.qty, 0);
   const q = query.trim().toLowerCase();
   const visible = products.filter((p) => (!category || p.category === category) && (!q || p.name.toLowerCase().includes(q)));
-  const showTools = categories.length > 1 || products.length >= 6;
+  const showSearch = layout.showSearch && products.length >= 6;
+  const showTools = layout.showSearch && (categories.length > 1 || products.length >= 6);
+  const left = layout.align === "left";
 
   function onTelegramLoad() {
     const w = webApp();
@@ -178,9 +290,9 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
       {!shop.embedded && <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={onTelegramLoad} />}
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-5">
         {(heading || subheading) && (
-          <div className="text-center">
+          <div className={left ? "" : "text-center"}>
             {heading && <h2 className="text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
-            {subheading && <p className="mx-auto mt-2 max-w-2xl text-[color:var(--s-muted)]">{subheading}</p>}
+            {subheading && <p className={`mt-2 max-w-2xl text-[color:var(--s-muted)] ${left ? "" : "mx-auto"}`}>{subheading}</p>}
           </div>
         )}
 
@@ -192,7 +304,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
 
         {showTools && (
           <div className="sticky top-16 z-[5] -mx-4 mt-6 space-y-2 bg-[color:var(--s-bg)]/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-            {products.length >= 6 && (
+            {showSearch && (
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 Qidirish…" className={`${input} py-2`} />
             )}
             {categories.length > 1 && (
@@ -219,16 +331,20 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
         ) : visible.length === 0 ? (
           <p className="mt-10 text-center text-[color:var(--s-muted)]">Hech narsa topilmadi</p>
         ) : (
-          <div className={`mt-6 grid gap-3 sm:gap-5 ${visible.length === 1 ? "mx-auto max-w-xs grid-cols-1" : visible.length === 2 ? "mx-auto max-w-xl grid-cols-2" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"}`}>
+          <div
+            className={`mt-6 grid gap-3 sm:gap-5 ${
+              visible.length === 1 && !left ? "mx-auto max-w-xs grid-cols-1" : visible.length === 2 && !left ? "mx-auto max-w-xl grid-cols-2" : GRID[layout.mobileColumns][layout.columns]
+            }`}
+          >
             {visible.map((p) => {
               const off = discount(p);
               return (
                 <article
                   key={p.id}
-                  className="group flex flex-col overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] transition hover:-translate-y-0.5 hover:shadow-lg"
+                  className={`s-card group flex flex-col overflow-hidden rounded-[var(--s-radius)] bg-[color:var(--s-bg)] transition hover:-translate-y-0.5 ${CARD[layout.card]}`}
                 >
                   <button type="button" onClick={() => setDetail(p)} className="relative block text-left" aria-label={p.name}>
-                    <ProductImage p={p} className={`aspect-square w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
+                    <ProductImage p={p} className={`${RATIO[layout.ratio]} w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
                     {off > 0 && (
                       <span className="absolute top-2 left-2 rounded-full bg-[color:var(--s-accent)] px-2 py-0.5 text-xs font-bold text-white">−{off}%</span>
                     )}
@@ -240,6 +356,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
                     <button type="button" onClick={() => setDetail(p)} className="text-left">
                       <h3 className="line-clamp-2 text-[15px] leading-snug font-semibold">{p.name}</h3>
                     </button>
+                    {layout.showDescription && p.description && <p className="mt-1 line-clamp-2 text-sm text-[color:var(--s-muted)]">{p.description}</p>}
                     <div className="mt-auto pt-2">
                       <p className="flex flex-wrap items-baseline gap-x-2">
                         <span className="text-base font-extrabold text-[color:var(--s-heading)] sm:text-lg">{formatMoney(p.price)}</span>
@@ -261,7 +378,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setDetail(null)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
+            className="s-card max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
           >
             <div className="relative">
               <ProductImage p={detail} big className="aspect-square w-full" />
@@ -292,7 +409,10 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
                       type="button"
                       onClick={() => {
                         setDetail(null);
-                        if (!shop.embedded) setOpen("cart");
+                        if (!shop.embedded) {
+                          store.openRequest = Date.now();
+                          notify(store);
+                        }
                       }}
                       className={`${btnAccent} py-3`}
                     >
@@ -310,7 +430,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
         </div>
       )}
 
-      {count > 0 && open === null && !detail && !shop.embedded && (
+      {isOwner && count > 0 && open === null && !detail && !shop.embedded && (
         <div className="fixed inset-x-0 bottom-0 z-40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
@@ -326,7 +446,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
         </div>
       )}
 
-      {open && !shop.embedded && (
+      {isOwner && open && !shop.embedded && (
         <CartDrawer
           shop={shop}
           lines={lines}
@@ -336,8 +456,9 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
           onStep={setOpen}
           onQty={update}
           onClear={() => {
-            setCart({});
+            store.cart = {};
             saveCart(shop.slug, {});
+            notify(store);
           }}
         />
       )}
@@ -429,7 +550,7 @@ function CartDrawer({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => step !== "done" && onStep(null)}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] p-5 text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
+        className="s-card max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] p-5 text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
       >
         {step === "done" ? (
           <div className="py-6 text-center">

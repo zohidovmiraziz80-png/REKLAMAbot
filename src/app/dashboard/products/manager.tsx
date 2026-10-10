@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import type { Product } from "@/actions/shop";
 import { formatMoney } from "@/lib/shop/format";
+import { uploadImage } from "@/lib/upload-image";
 import { deleteProductAction, saveProductAction, setProductActiveAction } from "./actions";
 
 const input =
@@ -43,31 +44,6 @@ function toDraft(p: Product): Draft {
 
 const digits = (v: string) => v.replace(/\D/g, "");
 const spaced = (v: string) => (v ? v.replace(/\B(?=(\d{3})+(?!\d))/g, " ") : "");
-
-/** Rasmni brauzerda 1600px gacha kichraytirib JPEG qiladi (yuklash tez va arzon bo'lsin) */
-async function shrinkImage(file: File): Promise<Blob> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("Rasmni o'qib bo'lmadi"));
-      i.src = url;
-    });
-    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.85));
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 function Thumb({ p, size = "size-12" }: { p: { image_url: string | null; emoji: string; name: string }; size?: string }) {
   return p.image_url ? (
@@ -280,24 +256,11 @@ function ProductEditor({
 
   async function upload(file: File) {
     setError(null);
-    if (!file.type.startsWith("image/")) {
-      setError("Faqat rasm fayl tanlang");
-      return;
-    }
     setUploading(true);
-    try {
-      const blob = await shrinkImage(file);
-      const form = new FormData();
-      form.append("file", new File([blob], "product.jpg", { type: blob.type || "image/jpeg" }));
-      const res = await fetch("/api/uploads/product-image", { method: "POST", body: form });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; url?: string; error?: string };
-      if (data.ok && data.url) set("imageUrl", data.url);
-      else setError(data.error ?? "Rasm yuklanmadi");
-    } catch {
-      setError("Rasm yuklanmadi");
-    } finally {
-      setUploading(false);
-    }
+    const r = await uploadImage(file);
+    setUploading(false);
+    if (r.ok) set("imageUrl", r.url);
+    else setError(r.error);
   }
 
   function save(e: React.FormEvent) {

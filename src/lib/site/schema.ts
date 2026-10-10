@@ -23,11 +23,39 @@ export function randomId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Faqat https rasm manzili (aks holda bo'sh) */
+const imageUrl = z
+  .string()
+  .transform((s) => {
+    const v = s.trim().slice(0, 500);
+    return /^https:\/\/[^\s"'<>()]+$/.test(v) ? v : "";
+  })
+  .catch("");
+
+/** Eski saqlangan saytlar buzilmasligi uchun yangi maydonlar ixtiyoriy */
+const opt = <T extends z.ZodTypeAny>(schema: T) => schema.optional().catch(undefined);
+
+/** Har bir blok uchun dizayn: fon, bo'shliq, sarlavha joylashuvi */
+export const blockStyleSchema = z.object({
+  bg: z.enum(["default", "surface", "primary", "accent", "dark", "custom", "image"]).catch("default"),
+  bgColor: hex.catch("#f5f7fb"),
+  bgImage: imageUrl,
+  pad: z.enum(["sm", "md", "lg"]).catch("md"),
+  align: z.enum(["left", "center"]).catch("center"),
+});
+export type BlockStyle = z.output<typeof blockStyleSchema>;
+export const DEFAULT_BLOCK_STYLE: BlockStyle = { bg: "default", bgColor: "#f5f7fb", bgImage: "", pad: "md", align: "center" };
+const style = opt(blockStyleSchema);
+
 // ===== Bloklar =====
 
 export const heroBlock = z.object({
   type: z.literal("hero"),
   id,
+  style,
+  /** Fon yoki yon rasm */
+  image: opt(imageUrl),
+  imageMode: opt(z.enum(["background", "side"])),
   heading: txt(120),
   subheading: txt(300),
   ctaText: txt(40),
@@ -38,6 +66,7 @@ export const heroBlock = z.object({
 export const featuresBlock = z.object({
   type: z.literal("features"),
   id,
+  style,
   heading: txt(120),
   items: z
     .array(z.object({ icon: txt(8), title: txt(80), text: txt(240) }))
@@ -48,6 +77,7 @@ export const featuresBlock = z.object({
 export const productsBlock = z.object({
   type: z.literal("products"),
   id,
+  style,
   heading: txt(120),
   subheading: txt(240),
   items: z
@@ -68,13 +98,56 @@ export const productsBlock = z.object({
 export const shopBlock = z.object({
   type: z.literal("shop"),
   id,
+  style,
   heading: txt(120),
   subheading: txt(240),
+  /** Faqat shu kategoriya (bo'sh = hammasi) — har xil joyda alohida kataloglar qo'yish uchun */
+  category: opt(txt(60)),
+  limit: opt(z.number().int().min(0).max(48)),
+  columns: opt(z.enum(["2", "3", "4"])),
+  mobileColumns: opt(z.enum(["1", "2"])),
+  card: opt(z.enum(["border", "shadow", "flat"])),
+  ratio: opt(z.enum(["square", "portrait", "landscape"])),
+  showDescription: opt(z.boolean()),
+  showSearch: opt(z.boolean()),
+});
+
+export const imageBlock = z.object({
+  type: z.literal("image"),
+  id,
+  style,
+  src: imageUrl,
+  alt: txt(120),
+  caption: txt(200),
+  link: txt(300),
+  width: z.enum(["contained", "full"]).catch("contained"),
+});
+
+export const galleryBlock = z.object({
+  type: z.literal("gallery"),
+  id,
+  style,
+  heading: txt(120),
+  images: z
+    .array(z.object({ src: imageUrl, caption: txt(120) }))
+    .max(24)
+    .catch([]),
+  columns: z.enum(["2", "3", "4"]).catch("3"),
+});
+
+export const textBlock = z.object({
+  type: z.literal("text"),
+  id,
+  style,
+  heading: txt(120),
+  text: txt(4000),
 });
 
 export const aboutBlock = z.object({
   type: z.literal("about"),
   id,
+  style,
+  image: opt(imageUrl),
   heading: txt(120),
   text: txt(1500),
 });
@@ -82,6 +155,7 @@ export const aboutBlock = z.object({
 export const testimonialsBlock = z.object({
   type: z.literal("testimonials"),
   id,
+  style,
   heading: txt(120),
   items: z
     .array(z.object({ name: txt(60), role: txt(60), text: txt(400) }))
@@ -92,6 +166,7 @@ export const testimonialsBlock = z.object({
 export const faqBlock = z.object({
   type: z.literal("faq"),
   id,
+  style,
   heading: txt(120),
   items: z
     .array(z.object({ q: txt(200), a: txt(800) }))
@@ -102,6 +177,7 @@ export const faqBlock = z.object({
 export const ctaBlock = z.object({
   type: z.literal("cta"),
   id,
+  style,
   heading: txt(120),
   text: txt(300),
   buttonText: txt(40),
@@ -111,6 +187,7 @@ export const ctaBlock = z.object({
 export const contactBlock = z.object({
   type: z.literal("contact"),
   id,
+  style,
   heading: txt(120),
   text: txt(300),
   phone: txt(30),
@@ -125,6 +202,9 @@ export const blockSchema = z.discriminatedUnion("type", [
   featuresBlock,
   productsBlock,
   shopBlock,
+  imageBlock,
+  galleryBlock,
+  textBlock,
   aboutBlock,
   testimonialsBlock,
   faqBlock,
@@ -138,6 +218,9 @@ export const BLOCK_TYPES: BlockType[] = [
   "hero",
   "features",
   "shop",
+  "image",
+  "gallery",
+  "text",
   "products",
   "about",
   "testimonials",
@@ -196,6 +279,15 @@ export const siteSchema = z
     tagline: txt(120),
     language: z.enum(["uz", "ru", "en"]).catch("uz"),
     theme: themeSchema.catch({ primary: "#0f2d6b", accent: "#f7821b", font: "modern", radius: "soft", mode: "light" }),
+    /** Sayt yuqori qismi: logotip, menyu, tugma */
+    header: opt(
+      z.object({
+        logo: imageUrl,
+        showNav: z.boolean().catch(true),
+        ctaText: txt(30),
+        ctaLink: txt(300),
+      }),
+    ),
     pages: z.array(pageSchema).min(1).transform((p) => p.slice(0, 6)),
   })
   .transform((site) => {
@@ -248,6 +340,12 @@ export function defaultBlock(type: BlockType): Block {
       };
     case "shop":
       return { ...base, type, heading: "Katalog", subheading: "Savatga qo'shing va onlayn buyurtma bering" };
+    case "image":
+      return { ...base, type, src: "", alt: "", caption: "", link: "", width: "contained" };
+    case "gallery":
+      return { ...base, type, heading: "Galereya", images: [], columns: "3" };
+    case "text":
+      return { ...base, type, heading: "Sarlavha", text: "Matningizni shu yerga yozing." };
     case "about":
       return { ...base, type, heading: "Biz haqimizda", text: "Biznesingiz haqida bir necha jumla." };
     case "testimonials":
@@ -270,6 +368,9 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   hero: "Bosh banner",
   features: "Afzalliklar",
   shop: "Do'kon (katalog + savat)",
+  image: "Rasm / banner",
+  gallery: "Galereya",
+  text: "Matn",
   products: "Mahsulotlar / xizmatlar (qo'lda)",
   about: "Biz haqimizda",
   testimonials: "Mijozlar fikri",
