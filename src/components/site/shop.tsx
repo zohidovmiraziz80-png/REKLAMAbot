@@ -534,6 +534,9 @@ function CartDrawer({
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
   const [geo, setGeo] = useState<{ lat: number; lon: number } | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState<{ code: string; discount: number; label: string } | null>(null);
+  const [promoMsg, setPromoMsg] = useState<string | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
   type Pay = "cash" | "card" | "payme" | "click" | "multicard";
   const payOptions: Pay[] = [...(s.cashEnabled ? (["cash"] as const) : []), ...(s.cardEnabled ? (["card"] as const) : []), ...s.payMethods];
@@ -554,7 +557,8 @@ function CartDrawer({
 
   const deliveryPrice =
     delivery === "courier" ? (s.freeDeliveryFrom !== null && subtotal >= s.freeDeliveryFrom ? 0 : s.deliveryPrice) : 0;
-  const total = subtotal + deliveryPrice;
+  const discount = promo ? Math.min(promo.discount, subtotal) : 0;
+  const total = subtotal + deliveryPrice - discount;
   const belowMin = subtotal < s.minOrder;
 
   async function submit(e: React.FormEvent) {
@@ -581,6 +585,7 @@ function CartDrawer({
           payment,
           session: customer?.session ?? "",
           geo: delivery === "courier" ? geo : null,
+          promo: promo?.code ?? "",
           returnUrl: window.location.href.split("?")[0],
         }),
       });
@@ -761,11 +766,58 @@ function CartDrawer({
                   <input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} className={input} />
                 </label>
 
+                <div>
+                  <span className="mb-1 block text-sm font-medium">Promo-kod</span>
+                  {promo ? (
+                    <div className="flex items-center justify-between rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-accent)] px-3 py-2 text-sm">
+                      <span>
+                        🎁 <b>{promo.code}</b> · {promo.label}
+                      </span>
+                      <button type="button" onClick={() => setPromo(null)} className="text-xs text-[color:var(--s-muted)] underline">
+                        olib tashlash
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} maxLength={30} className={input} placeholder="Masalan YANGI10" />
+                      <button
+                        type="button"
+                        disabled={!promoInput.trim() || shop.preview}
+                        onClick={async () => {
+                          setPromoMsg(null);
+                          try {
+                            const r = await fetch(`/api/shop/${shop.slug}/promo`, {
+                              method: "POST",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ code: promoInput, subtotal }),
+                            });
+                            const d = (await r.json()) as { ok?: boolean; code?: string; discount?: number; label?: string; error?: string };
+                            if (d.ok && d.code) setPromo({ code: d.code, discount: d.discount ?? 0, label: d.label ?? "" });
+                            else setPromoMsg(d.error ?? "Promo-kod qabul qilinmadi");
+                          } catch {
+                            setPromoMsg("Internet aloqasini tekshiring");
+                          }
+                        }}
+                        className="shrink-0 rounded-[var(--s-radius)] border border-[color:var(--s-line)] px-4 text-sm font-medium disabled:opacity-50"
+                      >
+                        Qo&apos;llash
+                      </button>
+                    </div>
+                  )}
+                  {promoMsg && <p className="mt-1 text-xs text-red-600">{promoMsg}</p>}
+                </div>
+
                 <div className="space-y-1 rounded-[calc(var(--s-radius)*0.6)] bg-[color:var(--s-surface)] p-3 text-sm">
                   <div className="flex justify-between">
                     <span>Mahsulotlar</span>
                     <span>{formatMoney(subtotal)}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Chegirma ({promo?.code})</span>
+                      <span>−{formatMoney(discount)}</span>
+                    </div>
+                  )}
                   {delivery === "courier" && (
                     <div className="flex justify-between">
                       <span>Yetkazish</span>

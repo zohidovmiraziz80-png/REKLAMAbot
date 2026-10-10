@@ -6,6 +6,7 @@ import { assignPayAmount } from "@/lib/payments/card";
 import { loadPayConfigs } from "@/lib/payments/config";
 import { verifySession } from "@/lib/shop/customer-session";
 import { formatMoney } from "@/lib/shop/format";
+import { evaluatePromo } from "@/lib/shop/promo";
 import { clickCheckoutUrl, multicardCheckoutUrl, paymeCheckoutUrl } from "@/lib/payments/core";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { normalizeUzPhone } from "@/lib/phone";
@@ -37,6 +38,7 @@ const body = z.object({
   tgLink: z.object({ bot: z.string().max(64), chat: z.string().max(64) }).nullable().default(null),
   payment: z.enum(["cash", "card", "payme", "click", "multicard"]).default("cash"),
   session: z.string().max(1200).default(""),
+  promo: z.string().max(40).default(""),
   geo: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).nullable().default(null),
   returnUrl: z.string().max(500).default(""),
 });
@@ -182,6 +184,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const result = created as { id: string; number: number; total: number };
+
+  // Promo-kod: chegirma mahsulotlar summasidan hisoblanadi
+  if (input.promo.trim()) {
+    const { data: o } = await db.from("orders").select("subtotal, total").eq("id", result.id).single();
+    const pr = await evaluatePromo(db, workspaceId, input.promo, Number(o?.subtotal ?? 0));
+    if (pr.ok && pr.discount > 0) {
+      const total = Math.max(0, Number(o?.total ?? result.total) - pr.discount);
+      const { error: discErr } = await db.from("orders").update({ discount: pr.discount, total, promo_code: pr.promo.code }).eq("id", result.id);
+      if (!discErr) {
+        result.total = total;
+        await db.from("promo_codes").update({ used_count: pr.promo.used_count + 1 }).eq("id", pr.promo.id);
+      }
+    }
+  }
   if (input.payment !== "cash") await db.from("orders").update({ payment_method: input.payment }).eq("id", result.id);
   // Mijoz joylashuvi (kuryer chaqirish uchun)
   if (input.delivery === "courier" && input.geo) {
