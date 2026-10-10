@@ -133,7 +133,8 @@ export async function priceMap(c: BitoCreds, priceId: string, organizationId: st
 }
 
 /** Mahsulot rasmi Bito'da "/uploads/..." ko'rinishida — to'liq manzilni topamiz */
-const IMAGE_HOSTS = ["https://api.bito.uz", "https://app.bito.uz", "https://bito.uz", "https://cdn.bito.uz"];
+// Bito veb-ilovasi rasmlarni shu manzildan oladi: https://api.bito.uz/upload-api/public/uploads/...
+const IMAGE_HOSTS = ["https://api.bito.uz/upload-api/public", "https://api.bito.uz"];
 export async function detectImageHost(samplePath: string | undefined): Promise<string | null> {
   if (!samplePath) return null;
   if (/^https:\/\//.test(samplePath)) return "";
