@@ -13,7 +13,7 @@ type Row = {
   owner_email: string | null;
   owner_name: string | null;
   owner_phone: string | null;
-  plan_id: "bot" | "site" | "site_bot";
+  plan_id: "bot" | "site" | "site_bot" | "business";
   plan_status: "trial" | "active" | "expired";
   trial_ends_at: string | null;
   created_at: string;

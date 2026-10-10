@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { maybeAutoSyncBito } from "@/lib/integrations/bito-sync";
 import { enabledPayMethods } from "@/lib/payments/config";
+import { getWorkspacePlan } from "@/lib/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ShopData } from "./types";
 
@@ -52,18 +53,27 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
     const legacy = await db.from("shop_settings").select(BASE_COLS).eq("workspace_id", workspaceId).maybeSingle();
     return legacy.data as unknown as SettingsRow | null;
   };
-  const [products, s, payMethods, { count: botCount }] = await Promise.all([
+  const [products, s, allPayMethods, { data: botRows }, plan] = await Promise.all([
     loadProducts(),
     loadSettings(),
     enabledPayMethods(db, workspaceId),
-    db.from("bots").select("project_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    db.from("bots").select("username, config").eq("workspace_id", workspaceId).order("created_at"),
+    getWorkspacePlan(db, workspaceId),
   ]);
+  // Onlayn to'lovlar faqat integratsiyali (Biznes) tarifda
+  const payMethods = plan.integrations ? allPayMethods : [];
+  const bots = botRows ?? [];
+  const mainBot =
+    bots.find((b) => {
+      const url = String((b.config as { siteUrl?: string } | null)?.siteUrl ?? "");
+      return url.includes(`/s/${slug}`) || url.includes(`//${slug}.`);
+    }) ?? bots[0];
   const cardEnabled = !!(s?.card_enabled && s.card_number);
 
   // Bito ulangan bo'lsa — narx va qoldiq 3 soatdan eski bo'lsa, javobdan keyin fonda yangilanadi
   if (!opts.preview) {
     try {
-      after(() => maybeAutoSyncBito(db, workspaceId));
+      if (plan.integrations) after(() => maybeAutoSyncBito(db, workspaceId));
     } catch {
       // after() faqat so'rov ichida ishlaydi
     }
@@ -95,7 +105,9 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
       cashEnabled: s?.cash_enabled !== false || (payMethods.length === 0 && !cardEnabled),
       cardEnabled,
       payMethods,
-      loginEnabled: (botCount ?? 0) > 0,
+      loginEnabled: bots.length > 0,
+      telegramOnly: !plan.sitePublic,
+      botUsername: (mainBot?.username as string | undefined) ?? null,
     },
   };
 }

@@ -27,6 +27,10 @@ export type PublicShopSettings = {
   cardEnabled: boolean;
   /** Mijoz kabineti (Telegram orqali kirish) — do'konda bot ulangan bo'lsa */
   loginEnabled: boolean;
+  /** "Bot" tarifi: sayt faqat Telegram Mini App ichida ochiladi */
+  telegramOnly: boolean;
+  /** Do'konning asosiy boti (havola uchun) */
+  botUsername: string | null;
   /** Ulangan onlayn to'lov usullari */
   payMethods: ("payme" | "click" | "multicard")[];
 };

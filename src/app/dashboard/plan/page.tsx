@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
 import { runAction } from "@/actions/run";
 import { getMyPlan } from "@/actions/plans";
-import { formatPrice, type PlanId } from "@/lib/plans";
+import { PLAN_DEFS, formatPrice } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Tarif" };
-
-const FEATURES: Record<PlanId, string[]> = {
-  bot: ["Telegram bot ulash", "Menyu tugmalari va javoblar", "Mini App tugmasi (istalgan sayt)", "Arizalar va egaga xabar"],
-  site: ["6 ta tayyor shablon", "Vizual tahrirlovchi", "Internetga nashr qilish", "O'z domenini ulash"],
-  site_bot: ["Sayt tarifidagi hammasi", "Bot tarifidagi hammasi", "Sayt bot ichida Mini App bo'lib ochiladi", "Bitta joydan boshqaruv"],
-};
 
 const UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentyabr", "oktyabr", "noyabr", "dekabr"];
 function formatDate(iso: string) {
@@ -46,7 +40,7 @@ export default async function PlanPage() {
         )}
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrent = current.status === "active" && current.planId === plan.id;
           const highlight = plan.id === "site_bot";
@@ -62,7 +56,7 @@ export default async function PlanPage() {
               <p className="mt-1 text-sm text-muted">{plan.description}</p>
               <p className="mt-4 text-lg font-bold text-brand-700">{formatPrice(plan.price_uzs)}</p>
               <ul className="mt-4 flex-1 space-y-2 text-sm">
-                {FEATURES[plan.id].map((f) => (
+                {PLAN_DEFS[plan.id].features.map((f) => (
                   <li key={f} className="flex gap-2">
                     <span className="text-emerald-600">✓</span>
                     {f}

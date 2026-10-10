@@ -9,6 +9,7 @@ import { publicSiteUrls } from "@/lib/site/hosting";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
 import { requireFeature } from "./plan-guard";
+import { getWorkspacePlan } from "@/lib/plans";
 
 /** Vercel'ning barcha domenlariga xizmat qiluvchi doimiy IP (Vercel hujjatlaridagi A yozuvi) */
 const VERCEL_EDGE_IP = "76.76.21.21";
@@ -147,7 +148,7 @@ export const connectBot = defineAction({
   input: z.object({ projectId: z.string().uuid(), token: z.string().trim().max(100) }),
   handler: async (ctx, input): Promise<{ username: string }> => {
     const project = await loadBotProject(ctx, input.projectId);
-    await requireFeature(ctx, "bots");
+    const plan = await requireFeature(ctx, "bots");
     if (!BOT_TOKEN_RE.test(input.token)) {
       throw new ActionError("validation", "Token formati noto'g'ri. U 123456789:ABC... ko'rinishida bo'ladi.");
     }
@@ -210,7 +211,8 @@ export const connectBot = defineAction({
     const sites = await publishedSites(ctx);
     const config = existing ? botConfigSchema.parse(existing.config ?? {}) : defaultBotConfig(project.name, sites[0]?.url ?? "");
     try {
-      await syncMenuButton(input.token, config);
+      // "Sayt" tarifida bot faqat tasdiqlash uchun — Mini App menyu tugmasi qo'yilmaydi
+      await syncMenuButton(input.token, plan.botShop ? config : { ...config, siteUrl: "" });
     } catch {
       // ixtiyoriy
     }
@@ -266,7 +268,8 @@ export const saveBotConfig = defineAction({
     let menuButtonSynced = true;
     const token = decryptSecret(data.token_encrypted as string);
     try {
-      await syncMenuButton(token, config);
+      const plan = await getWorkspacePlan(ctx.supabase, ctx.workspaceId);
+      await syncMenuButton(token, plan.botShop ? config : { ...config, siteUrl: "" });
     } catch {
       menuButtonSynced = false;
     }

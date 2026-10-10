@@ -16,7 +16,7 @@ async function adminClient() {
 
 const planInput = z.object({
   workspaceId: z.string().uuid(),
-  planId: z.enum(["bot", "site", "site_bot"]),
+  planId: z.enum(["bot", "site", "site_bot", "business"]),
   status: z.enum(["trial", "active", "expired"]),
   trialEndsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
 });
@@ -40,7 +40,7 @@ export async function adminSetPlan(input: z.input<typeof planInput>): Promise<{ 
 }
 
 const priceInput = z.object({
-  planId: z.enum(["bot", "site", "site_bot"]),
+  planId: z.enum(["bot", "site", "site_bot", "business"]),
   price: z.number().int().min(0).max(1_000_000_000).nullable(),
 });
 

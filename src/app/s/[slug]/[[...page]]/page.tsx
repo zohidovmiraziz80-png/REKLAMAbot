@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { SiteRenderer } from "@/components/site/renderer";
+import { TelegramGate } from "@/components/site/telegram-gate";
 import { loadShopData } from "@/lib/shop/public";
 import { siteSchema } from "@/lib/site/schema";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -58,5 +59,14 @@ export default async function PublicSitePage({ params }: { params: Params }) {
   if (!current) notFound();
 
   const shop = await loadShopData(loaded.workspaceId, slug);
-  return <SiteRenderer site={site} page={current} basePath={await basePath(slug)} shop={shop ?? undefined} />;
+  const content = <SiteRenderer site={site} page={current} basePath={await basePath(slug)} shop={shop ?? undefined} />;
+  // "Bot" tarifi: sayt faqat Telegram Mini App ichida
+  if (shop?.settings.telegramOnly) {
+    return (
+      <TelegramGate botUsername={shop.settings.botUsername} siteName={site.name}>
+        {content}
+      </TelegramGate>
+    );
+  }
+  return content;
 }

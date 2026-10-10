@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { runAction } from "@/actions/run";
 import { listIntegrations } from "@/actions/integrations";
+import { getMyPlan } from "@/actions/plans";
 
 export const metadata: Metadata = { title: "Integratsiyalar" };
 
@@ -22,7 +23,8 @@ const CARDS: Card[] = [
 ];
 
 export default async function IntegrationsPage() {
-  const result = await runAction(listIntegrations, {});
+  const [result, planRes] = await Promise.all([runAction(listIntegrations, {}), runAction(getMyPlan, {})]);
+  const plan = planRes.ok ? planRes.data.current : null;
   const connected = new Map((result.ok ? result.data : []).map((i) => [i.provider, i]));
   const groups = [...new Set(CARDS.map((c) => c.group))];
 
@@ -30,6 +32,14 @@ export default async function IntegrationsPage() {
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Integratsiyalar</h1>
       <p className="mt-1 text-muted">Xizmatlarni o&apos;z kalitingiz bilan ulang. Kalitlar shifrlanib saqlanadi va hech kimga ko&apos;rinmaydi.</p>
+      {plan && !plan.integrations && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Bito, Payme, Click va Multicard <b>Biznes</b> tarifida ishlaydi. Joriy tarif: {plan.planName}.{" "}
+          <Link href="/dashboard/plan" className="font-semibold underline">
+            Tariflar
+          </Link>
+        </div>
+      )}
 
       {groups.map((g) => (
         <section key={g} className="mt-8">

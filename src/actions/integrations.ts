@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
+import { requireFeature } from "./plan-guard";
 
 /**
  * Integratsiyalar: mijoz o'z kalitini o'zi kiritadi. Kalit shifrlanadi va hech qachon brauzerga qaytmaydi.
@@ -69,6 +70,7 @@ export const connectBito = defineAction({
   input: z.object({ apiKey: z.string().trim().min(5).max(300) }),
   minRole: "admin",
   handler: async (ctx, input) => {
+    await requireFeature(ctx, "integrations");
     const apiKey = input.apiKey.replace(/^api-key:\s*/i, "").trim();
     if (!/^[^\s:]+:[^\s]+$/.test(apiKey)) {
       throw new ActionError("validation", "Kalit username:secret ko'rinishida bo'lishi kerak. Bito → Integratsiya bo'limidan to'liq nusxalang.");
@@ -217,6 +219,7 @@ export const syncBitoNow = defineAction({
   input: z.object({}),
   minRole: "admin",
   handler: async (ctx): Promise<SyncResult> => {
+    await requireFeature(ctx, "integrations");
     const { data } = await ctx.supabase.from("integrations").select("provider").eq("workspace_id", ctx.workspaceId).eq("provider", "bito").maybeSingle();
     if (!data) throw new ActionError("not_found", "Avval Bito'ni ulang");
     try {
@@ -300,6 +303,7 @@ export const connectPayProvider = defineAction({
   }),
   minRole: "admin",
   handler: async (ctx, input) => {
+    await requireFeature(ctx, "integrations");
     if (!isEncryptionConfigured()) throw new ActionError("internal", "Server shifrlash kaliti sozlanmagan");
     const schema = input.provider === "payme" ? paymeSettings : input.provider === "click" ? clickSettings : multicardSettings;
     const parsed = schema.safeParse(input.settings);

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { handleChannelPost } from "@/lib/payments/card";
 import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
+import { getWorkspacePlan } from "@/lib/plans";
+import { publicSiteUrls } from "@/lib/site/hosting";
 import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 import { loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
 import { tg } from "./api";
@@ -193,7 +195,7 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   const chatId = msg.chat.id;
   const cfg = botConfigSchema.parse(bot.config ?? {});
   const link = { botProjectId: bot.project_id, chatId };
-  const menu = () => menuKeyboard(cfg, link);
+  const menu = () => (confirmOnly ? { remove_keyboard: true } : menuKeyboard(cfg, link));
   const text = (msg.text ?? "").trim();
   const name = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(" ").slice(0, 120) || null;
   const username = msg.from?.username ?? null;
@@ -222,6 +224,21 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     await db.from("bot_subscribers").update({ state: s }).eq("project_id", bot.project_id).eq("chat_id", chatId);
   };
 
+  // "Sayt" tarifi: bot faqat mijozni tasdiqlash va buyurtma xabarlari uchun
+  const plan = await getWorkspacePlan(db, bot.workspace_id);
+  const confirmOnly = !plan.botShop;
+  const sendSiteLink = async (body: string) => {
+    let url = safeBotUrl(cfg.siteUrl);
+    if (!url) {
+      const { data: pub } = await db.from("published_sites").select("slug").eq("workspace_id", bot.workspace_id).limit(1).maybeSingle();
+      if (pub) {
+        const u = publicSiteUrls(pub.slug as string);
+        url = u.subdomainUrl ?? u.pathUrl;
+      }
+    }
+    await send(body, url ? { inline_keyboard: [[{ text: "🛍 Saytga o'tish", url }]] } : { remove_keyboard: true });
+  };
+
   // /start va administratorni ulash
   if (text.startsWith("/start")) {
     const payload = text.split(/\s+/)[1] ?? "";
@@ -239,6 +256,10 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     if (payload && payload === `owner_${bot.owner_link_code}`) {
       await db.from("bots").update({ owner_chat_id: chatId }).eq("project_id", bot.project_id);
       await send("✅ Siz bu botning administratori sifatida ulandingiz. Yangi buyurtma va arizalar shu chatga keladi.", menu());
+      return;
+    }
+    if (confirmOnly) {
+      await sendSiteLink(`${cfg.welcome}\n\nBuyurtma berish saytimizda 👇`);
       return;
     }
     await send(cfg.welcome, menu());
@@ -280,6 +301,11 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       await db.from("customers").insert({ workspace_id: bot.workspace_id, phone, name, telegram_chat_id: chatId, telegram_username: username });
     }
     await send("✅ Raqamingiz tasdiqlandi! Saytga qayting — kabinetingiz avtomatik ochiladi.\n\nBuyurtmalaringiz holati shu yerga ham keladi.", menu());
+    return;
+  }
+
+  if (confirmOnly) {
+    await sendSiteLink("Buyurtma berish va holatini ko'rish uchun saytimizga o'ting 👇 Buyurtma xabarlari shu yerga keladi.");
     return;
   }
 

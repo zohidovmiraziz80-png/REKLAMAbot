@@ -176,6 +176,7 @@ export const addCustomDomain = defineAction({
   requiresConfirmation: true,
   input: z.object({ projectId: z.string().uuid(), domain: z.string().max(253) }),
   handler: async (ctx, input): Promise<SiteDomainInfo> => {
+    await requireFeature(ctx, "publicSite");
     const project = await loadWebsiteProject(ctx, input.projectId);
     const domain = normalizeDomain(input.domain);
     if (!DOMAIN_RE.test(domain)) throw new ActionError("validation", "Domen nomi noto'g'ri. Masalan: mening-dokonim.uz");

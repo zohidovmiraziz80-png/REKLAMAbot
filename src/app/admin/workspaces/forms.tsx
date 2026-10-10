@@ -5,7 +5,7 @@ import { adminSetPlan, adminSetPrice } from "./actions";
 
 const select = "rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500";
 
-type PlanOption = { id: "bot" | "site" | "site_bot"; name: string };
+type PlanOption = { id: "bot" | "site" | "site_bot" | "business"; name: string };
 
 export function WorkspacePlanForm({
   workspaceId,

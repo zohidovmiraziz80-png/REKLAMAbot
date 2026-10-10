@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // To'lov usuli: onlayn bo'lsa — shu do'konda ulangan bo'lishi kerak
   const payConfigs = await loadPayConfigs(db, workspaceId);
   const online = input.payment === "payme" || input.payment === "click" || input.payment === "multicard";
-  if (online && !payConfigs[input.payment as "payme" | "click" | "multicard"]) return fail("Bu to'lov usuli hozir mavjud emas");
+  if (online && (!plan.integrations || !payConfigs[input.payment as "payme" | "click" | "multicard"])) return fail("Bu to'lov usuli hozir mavjud emas");
   let { data: cs } = await db.from("shop_settings").select("cash_enabled, card_enabled, card_number, card_holder").eq("workspace_id", workspaceId).maybeSingle();
   if (!cs) {
     // Karta ustunlari hali bazada bo'lmasa
@@ -147,6 +147,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       botProjectId = sess.b;
     }
   }
+
+  // "Bot" tarifi: buyurtma faqat Telegram (Mini App yoki botda tasdiqlangan mijoz) orqali
+  if (!plan.sitePublic && !tgUser) return fail("Buyurtma berish uchun do'konni Telegram bot orqali oching", 403);
 
   const { data: created, error } = await db.rpc("create_order", {
     p_workspace: workspaceId,
@@ -228,7 +231,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (order) await notifyNewOrder(db, order, (settings?.order_thanks as string) || undefined, cardText);
 
   // Bito ulangan bo'lsa — javobdan keyin fonda sotuv buyurtmasi yaratiladi
-  after(async () => {
+  if (plan.integrations) after(async () => {
     try {
       await pushOrderToBito(db, result.id);
     } catch (err) {
