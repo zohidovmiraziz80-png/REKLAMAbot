@@ -60,7 +60,7 @@ type Order = {
   payment_method: string;
   pay_amount: number | null;
   total: number;
-  items: { name: string; qty: number }[];
+  items: { name: string; qty: number; price?: number; image_url?: string | null; emoji?: string }[];
   created_at: string;
 };
 
@@ -292,7 +292,21 @@ function Cabinet({ slug, saved }: { slug: string; saved: Saved }) {
                 <b>№{o.number}</b>
                 <span className="text-xs text-[color:var(--s-muted)]">{dateOf(o.created_at)}</span>
               </div>
-              <p className="mt-1 line-clamp-2 text-[color:var(--s-muted)]">{(o.items ?? []).map((i) => `${i.name} × ${i.qty}`).join(", ")}</p>
+              <ul className="mt-2 space-y-1.5">
+                {(o.items ?? []).slice(0, 6).map((i, idx) => (
+                  <li key={idx} className="flex items-center gap-2.5">
+                    {i.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={i.image_url} alt="" loading="lazy" className="size-11 shrink-0 rounded-lg object-cover" />
+                    ) : (
+                      <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--s-surface)] text-lg">{i.emoji || "📦"}</span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{i.name}</span>
+                    <span className="shrink-0 text-xs text-[color:var(--s-muted)]">× {i.qty}</span>
+                  </li>
+                ))}
+                {(o.items ?? []).length > 6 && <li className="text-xs text-[color:var(--s-muted)]">yana {(o.items ?? []).length - 6} ta…</li>}
+              </ul>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full bg-[color:var(--s-surface)] px-2 py-0.5 text-xs font-medium">{ORDER_STATUS_LABELS[o.status] ?? o.status}</span>
                 <span

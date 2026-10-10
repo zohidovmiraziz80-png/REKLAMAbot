@@ -558,23 +558,37 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
         return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       };
       const reqLabel: Record<string, string> = { new: "🆕 Qabul qilindi", in_progress: "⏳ Jarayonda", done: "✅ Bajarildi", cancelled: "❌ Bekor qilindi" };
-      const entries = [
-        ...(orders ?? []).map((o) => {
-          const st = o.status as OrderStatus;
-          const items = ((o.items as { name: string; qty: number }[]) ?? []).map((i) => `${i.name} × ${i.qty}`).join(", ");
-          return {
-            at: o.created_at as string,
-            text: `🛒 №${o.number} · ${dateOf(o.created_at as string)} · ${ORDER_STATUS_EMOJI[st]} ${ORDER_STATUS_LABELS[st]}\n${items.slice(0, 160)}\n💰 ${formatMoney(o.total as number)}`,
-          };
-        }),
-        ...(requests ?? []).map((r) => ({
-          at: r.created_at as string,
-          text: `📝 Ariza №${r.id} · ${dateOf(r.created_at as string)} · ${reqLabel[r.status as string] ?? r.status}\n${String(r.message).slice(0, 120)}`,
-        })),
-      ]
-        .sort((a, b) => (a.at < b.at ? 1 : -1))
-        .slice(0, 6);
-      await send(`📦 Oxirgi buyurtmalaringiz:\n\n${entries.map((e) => e.text).join("\n\n")}`, menu());
+      type Item = { name: string; qty: number; image_url?: string | null };
+      // Har bir buyurtma alohida — mahsulot rasmlari bilan (eskisi yuqorida, yangisi pastda)
+      for (const o of [...(orders ?? [])].reverse()) {
+        const st = o.status as OrderStatus;
+        const items = (o.items as Item[]) ?? [];
+        const caption = `🛒 №${o.number} · ${dateOf(o.created_at as string)} · ${ORDER_STATUS_EMOJI[st]} ${ORDER_STATUS_LABELS[st]}\n${items
+          .slice(0, 10)
+          .map((i) => `• ${i.name} × ${i.qty}`)
+          .join("\n")}\n💰 ${formatMoney(o.total as number)}`.slice(0, 1000);
+        const photos = items.map((i) => i.image_url).filter((u): u is string => !!u && /^https:\/\//.test(u)).slice(0, 10);
+        try {
+          if (photos.length > 1) {
+            await tg(bot.token, "sendMediaGroup", { chat_id: chatId, media: photos.map((u, i) => ({ type: "photo", media: u, ...(i === 0 ? { caption } : {}) })) });
+          } else if (photos.length === 1) {
+            await tg(bot.token, "sendPhoto", { chat_id: chatId, photo: photos[0], caption });
+          } else {
+            await send(caption);
+          }
+        } catch {
+          // rasm yuklanmasa — matn bilan
+          await send(caption).catch(() => undefined);
+        }
+      }
+      if (requests?.length) {
+        await send(
+          requests
+            .map((r) => `📝 Ariza №${r.id} · ${dateOf(r.created_at as string)} · ${reqLabel[r.status as string] ?? r.status}\n${String(r.message).slice(0, 120)}`)
+            .join("\n\n"),
+        );
+      }
+      await send(orders?.length ? "👆 Oxirgi buyurtmalaringiz" : "👆 Arizalaringiz", menu());
       return;
     }
     if (button.type === "webapp") {
