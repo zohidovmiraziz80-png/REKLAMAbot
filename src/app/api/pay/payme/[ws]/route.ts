@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const TIMEOUT_MS = 12 * 3600 * 1000; // Payme: 12 soat ichida yakunlanmasa bekor qilinadi
 
-type Rpc = { id?: number | string; method?: string; params?: Record<string, unknown> };
+type Rpc = { id?: number | string | null; method?: string; params?: Record<string, unknown> };
 
 const msg = (text: string) => ({ uz: text, ru: text, en: text });
 
