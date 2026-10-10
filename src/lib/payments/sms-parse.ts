@@ -49,12 +49,15 @@ export type ParsedPayment = { amount: number; incoming: boolean; orderRef: strin
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 /** To'lov tizimi boti xabari (Click, Payme, Multicard): "Оплата"/"To'lov" bu yerda kirimni bildiradi */
 const MERCHANT_BOT = /click|payme|paycom|multicard|uzum/i;
-const MERCHANT_PAID = ["оплата", "oplata", "to'lov", "tolov", "to‘lov", "успешн", "muvaffaqiyatli", "оплачен", "to'landi", "paid", "payment"];
+const MERCHANT_PAID = ["подтвержден", "оплата", "oplata", "to'lov", "tolov", "to‘lov", "успешн", "muvaffaqiyatli", "оплачен", "to'landi", "paid", "payment"];
 
 export function parsePaymentSms(rawText: string): ParsedPayment | null {
   // Buyurtma id (Click'da transaction_param sifatida ketadi) — topilsa summadan oldin ishlatiladi
   const orderRef = rawText.match(UUID_RE)?.[0]?.toLowerCase() ?? null;
-  const text = rawText.replace(new RegExp(UUID_RE.source, "gi"), " ");
+  const text = rawText
+    .replace(new RegExp(UUID_RE.source, "gi"), " ")
+    // Telefon raqamlari (+998*****8080, +998 90 123 45 67) summa deb olinmasin
+    .replace(/\+?998[\s*\d-]{0,14}/g, " ");
   const lower = text.toLowerCase();
   const merchantPaid = MERCHANT_BOT.test(lower) && MERCHANT_PAID.some((w) => lower.includes(w)) && !/qaytar|возврат|отмен|bekor/.test(lower);
   const isOut = !merchantPaid && OUTGOING.some((w) => lower.includes(w));
