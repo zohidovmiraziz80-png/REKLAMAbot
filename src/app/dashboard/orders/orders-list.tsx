@@ -192,6 +192,16 @@ function OrderCard({
                 <dd>
                   {DELIVERY_LABELS[o.delivery_method]}
                   {o.address && <>: {o.address}</>}
+                  {o.external_ids?.geo && (
+                    <a
+                      href={`https://yandex.uz/maps/?pt=${o.external_ids.geo.split(",").reverse().join(",")}&z=17&l=map`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block text-xs font-medium text-brand-600 hover:underline"
+                    >
+                      🗺 Xaritada ochish ({o.external_ids.geo_src === "gps" ? "mijoz joylashuvi" : "manzil bo'yicha"}) ↗
+                    </a>
+                  )}
                 </dd>
               </div>
               <div>

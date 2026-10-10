@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { linkCode, loadMainBot, updateBotConfig } from "@/lib/telegram/main-bot";
 import { ActionError, defineAction } from "./define";
 
-export type CourierSetup = { hasBot: boolean; joinLink: string | null; couriers: { chatId: number; name: string }[] };
+export type CourierSetup = { hasBot: boolean; botUsername: string | null; joinLink: string | null; couriers: { chatId: number; name: string }[]; admins: number[]; ownerLinked: boolean };
 
 export const getCourierSetup = defineAction({
   name: "getCourierSetup",
@@ -12,8 +12,15 @@ export const getCourierSetup = defineAction({
   input: z.object({}),
   handler: async (ctx): Promise<CourierSetup> => {
     const bot = await loadMainBot(createAdminClient(), ctx.workspaceId);
-    if (!bot) return { hasBot: false, joinLink: null, couriers: [] };
-    return { hasBot: true, joinLink: `https://t.me/${bot.username}?start=courier_${linkCode(bot.linkCode, "courier")}`, couriers: bot.config.couriers };
+    if (!bot) return { hasBot: false, botUsername: null, joinLink: null, couriers: [], admins: [], ownerLinked: false };
+    return {
+      hasBot: true,
+      botUsername: bot.username,
+      joinLink: `https://t.me/${bot.username}?start=courier_${linkCode(bot.linkCode, "courier")}`,
+      couriers: bot.config.couriers,
+      admins: bot.config.adminChatIds,
+      ownerLinked: !!bot.ownerChatId,
+    };
   },
 });
 
@@ -43,5 +50,19 @@ export const assignOrderCourier = defineAction({
       if (err instanceof CourierError) throw new ActionError("validation", err.message);
       throw err;
     }
+  },
+});
+
+export const saveOrderAdmins = defineAction({
+  name: "saveOrderAdmins",
+  description: "Yangi buyurtma va to'lov xabarlarini oladigan Telegram ID'lar ro'yxatini saqlaydi (ular buyurtma tugmalarini ham bosa oladi).",
+  input: z.object({ ids: z.array(z.number().int()).max(20) }),
+  minRole: "admin",
+  handler: async (ctx, input) => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (!bot) throw new ActionError("validation", "Avval Telegram botni ulang");
+    await updateBotConfig(db, bot.projectId, { adminChatIds: [...new Set(input.ids)] });
+    return { ok: true };
   },
 });

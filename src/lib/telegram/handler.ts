@@ -133,8 +133,8 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
     return;
   }
 
-  // Ruxsat: bot egasining chati yoki shu bot orqali ulangan do'kon guruhi
-  let allowed = bot.owner_chat_id === chatId;
+  // Ruxsat: bot egasi, qo'shimcha adminlar (Telegram ID) yoki shu bot orqali ulangan do'kon guruhi
+  let allowed = bot.owner_chat_id === chatId || botConfigSchema.parse(bot.config ?? {}).adminChatIds.includes(chatId);
   if (!allowed) {
     const { data: s } = await db.from("shop_settings").select("group_chat_id, group_bot_project_id").eq("workspace_id", bot.workspace_id).maybeSingle();
     allowed = !!s && s.group_chat_id === chatId && s.group_bot_project_id === bot.project_id;
@@ -237,6 +237,10 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
 /** Guruhda: "/ulash KOD" — buyurtmalar shu guruhga tushadigan bo'ladi */
 async function handleGroupMessage(db: SupabaseClient, bot: BotRuntime, msg: TgMessage) {
   const text = (msg.text ?? "").trim();
+  if (/^\/id(?:@\w+)?$/i.test(text)) {
+    await tg(bot.token, "sendMessage", { chat_id: msg.chat.id, text: `Bu guruh ID: ${msg.chat.id}` }).catch(() => undefined);
+    return;
+  }
   // Do'kon guruhiga forward qilingan to'lov xabari (Click bot va h.k.)
   if (msg.forward_origin || msg.forward_date) {
     const { data: g } = await db.from("shop_settings").select("group_chat_id, group_bot_project_id").eq("workspace_id", bot.workspace_id).maybeSingle();
@@ -370,6 +374,12 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     }
     await send(body, url ? { inline_keyboard: [[{ text: "🛍 Saytga o'tish", url }]] } : { remove_keyboard: true });
   };
+
+  // Telegram ID'ni bilish (Do'kon sozlamalariga admin qilib qo'shish uchun)
+  if (/^\/id(?:@\w+)?$/i.test(text)) {
+    await send(`🆔 Sizning Telegram ID: ${chatId}\n\nBuni MIXBOT → Buyurtmalar → Do'kon sozlamalari → «Buyurtma qabul qiluvchilar» ga qo'shing — yangi buyurtmalar shu yerga keladi.`);
+    return;
+  }
 
   // /start va administratorni ulash
   if (text.startsWith("/start")) {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
 import { retryOrderSync } from "@/actions/integrations";
 import { saveShopSettings, updateOrder } from "@/actions/shop";
-import { assignOrderCourier, removeCourier } from "@/actions/couriers";
+import { assignOrderCourier, removeCourier, saveOrderAdmins } from "@/actions/couriers";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "@/actions/delivery";
 
 export async function updateOrderAction(input: { id: string; status?: string; paymentStatus?: string; adminNote?: string }) {
@@ -83,6 +83,12 @@ export async function assignCourierAction(orderId: string, chatId: number) {
 
 export async function removeCourierAction(chatId: number) {
   const r = await runAction(removeCourier, { chatId });
+  revalidatePath("/dashboard/orders/settings");
+  return r;
+}
+
+export async function saveOrderAdminsAction(ids: number[]) {
+  const r = await runAction(saveOrderAdmins, { ids });
   revalidatePath("/dashboard/orders/settings");
   return r;
 }

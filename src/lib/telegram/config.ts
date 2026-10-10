@@ -79,6 +79,11 @@ export const botConfigSchema = z.object({
     .array(z.object({ chatId: z.number(), name: txt(80, "Kuryer") }))
     .catch([])
     .transform((a) => a.slice(0, 30)),
+  /** Buyurtma va to'lov xabarlarini oladigan qo'shimcha adminlar (Telegram ID) */
+  adminChatIds: z
+    .array(z.number().int())
+    .catch([])
+    .transform((a) => [...new Set(a)].slice(0, 20)),
   /** Tashlab ketilgan savat eslatmasi */
   abandonEnabled: z.boolean().catch(false),
   abandonHours: z.number().min(1).max(48).catch(2),
@@ -107,6 +112,7 @@ export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig 
     postChannelTitle: "",
     autoPostNew: false,
     couriers: [],
+    adminChatIds: [],
     abandonEnabled: false,
     abandonHours: 2,
     abandonText: "",

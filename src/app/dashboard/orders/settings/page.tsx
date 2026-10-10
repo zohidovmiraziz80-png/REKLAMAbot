@@ -5,6 +5,7 @@ import { getShopSettings } from "@/actions/shop";
 import { SettingsForm } from "./settings-form";
 import { getCourierSetup } from "@/actions/couriers";
 import { Couriers } from "./couriers";
+import { OrderAdmins } from "./order-admins";
 
 export const metadata: Metadata = { title: "Do'kon sozlamalari" };
 
@@ -25,6 +26,7 @@ export default async function ShopSettingsPage() {
 
       <SettingsForm initial={settings} />
 
+      {courierSetup.ok && <OrderAdmins setup={courierSetup.data} />}
       {courierSetup.ok && <Couriers setup={courierSetup.data} />}
 
       <section className="mt-6 rounded-2xl border border-line bg-white p-5">

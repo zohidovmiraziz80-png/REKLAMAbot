@@ -19,7 +19,7 @@ import {
  * Faqat serverda, service role klienti bilan chaqiriladi. Xatolar buyurtmani to'xtatmaydi.
  */
 
-type BotRow = { project_id: string; token: string; owner_chat_id: number | null };
+type BotRow = { project_id: string; token: string; owner_chat_id: number | null; admin_chat_ids: number[] };
 
 export type OrderRow = {
   id: string;
@@ -41,13 +41,14 @@ export type OrderRow = {
   payment_method?: string;
   payment_status?: string;
   pay_amount?: number | null;
+  external_ids?: Record<string, string> | null;
 };
 
 export const ORDER_COLUMNS =
-  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status, pay_amount";
+  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status, pay_amount, external_ids";
 
 const LEGACY_ORDER_COLUMNS =
-  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status";
+  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status, external_ids";
 
 /** Buyurtmani o'qish (yangi ustunlar hali bazada bo'lmasa — eski ro'yxat bilan) */
 export async function loadOrderRow(db: SupabaseClient, id: string, workspaceId?: string): Promise<OrderRow | null> {
@@ -67,18 +68,33 @@ const PAY_METHOD_LABELS: Record<string, string> = { cash: "Naqd", card: "Kartaga
 async function loadBots(db: SupabaseClient, workspaceId: string): Promise<BotRow[]> {
   const { data } = await db
     .from("bots")
-    .select("project_id, token_encrypted, owner_chat_id, created_at")
+    .select("project_id, token_encrypted, owner_chat_id, created_at, config")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true });
   const out: BotRow[] = [];
   for (const b of data ?? []) {
     try {
-      out.push({ project_id: b.project_id as string, token: decryptSecret(b.token_encrypted as string), owner_chat_id: (b.owner_chat_id as number | null) ?? null });
+      const admins = (b.config as { adminChatIds?: unknown } | null)?.adminChatIds;
+      out.push({
+        project_id: b.project_id as string,
+        token: decryptSecret(b.token_encrypted as string),
+        owner_chat_id: (b.owner_chat_id as number | null) ?? null,
+        admin_chat_ids: Array.isArray(admins) ? admins.filter((x): x is number => typeof x === "number") : [],
+      });
     } catch {
       // shifrni ochib bo'lmasa, bu botni o'tkazib yuboramiz
     }
   }
   return out;
+}
+
+/** Mijoz joylashuvi bo'yicha Yandex xarita havolasi (checkout'da yuborilgan bo'lsa) */
+export function mapLink(ext: Record<string, string> | null | undefined) {
+  const geo = ext?.geo;
+  if (!geo) return null;
+  const [lat, lon] = geo.split(",").map(Number);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return `https://yandex.uz/maps/?pt=${lon},${lat}&z=17&l=map`;
 }
 
 export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
@@ -98,7 +114,9 @@ export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
     "",
     `👤 ${o.customer_name ?? "—"}`,
     `📞 ${formatUzPhone(o.phone)}`,
-    `🚚 ${DELIVERY_LABELS[o.delivery_method] ?? o.delivery_method}${o.address ? `: ${o.address}` : ""}`,
+    o.delivery_method === "courier" ? `🚚 Yetkazib berish` : `🏪 Olib ketish`,
+    o.delivery_method === "courier" ? `📍 Manzil: ${o.address || "—"}` : "",
+    mapLink(o.external_ids) ? `🗺 Xarita: ${mapLink(o.external_ids)}` : "",
     o.comment ? `💬 ${o.comment}` : "",
   ];
   return lines.filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n").slice(0, 4000);
@@ -174,6 +192,9 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
     // Ega: buyurtma kelgan bot, bo'lmasa egasi ulangan birinchi bot
     const ownerBot = bots.find((b) => b.project_id === order.bot_project_id && b.owner_chat_id) ?? bots.find((b) => b.owner_chat_id);
     if (ownerBot?.owner_chat_id) await sendTo(ownerBot, ownerBot.owner_chat_id);
+    // Qo'shimcha adminlar (Do'kon sozlamalaridagi Telegram ID'lar) — asosiy bot orqali
+    const mainBot = bots[0];
+    for (const id of mainBot?.admin_chat_ids ?? []) await sendTo(mainBot, id);
 
     // Mijozga tasdiq (Mini App orqali kelgan bo'lsa)
     if (order.chat_id && order.bot_project_id) {

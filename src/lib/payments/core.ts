@@ -86,10 +86,18 @@ export async function multicardCheckoutUrl(
 }
 
 export async function ownerBots(db: SupabaseClient, workspaceId: string) {
-  const { data } = await db.from("bots").select("project_id, token_encrypted, owner_chat_id").eq("workspace_id", workspaceId);
+  const { data } = await db.from("bots").select("project_id, token_encrypted, owner_chat_id, config").eq("workspace_id", workspaceId).order("created_at");
   return (data ?? []).flatMap((b) => {
     try {
-      return [{ projectId: b.project_id as string, token: decryptSecret(b.token_encrypted as string), ownerChatId: (b.owner_chat_id as number | null) ?? null }];
+      const admins = (b.config as { adminChatIds?: unknown } | null)?.adminChatIds;
+      return [
+        {
+          projectId: b.project_id as string,
+          token: decryptSecret(b.token_encrypted as string),
+          ownerChatId: (b.owner_chat_id as number | null) ?? null,
+          adminChatIds: Array.isArray(admins) ? admins.filter((x): x is number => typeof x === "number") : [],
+        },
+      ];
     } catch {
       return [];
     }
@@ -112,9 +120,11 @@ export async function markOrderPaid(db: SupabaseClient, orderId: string, provide
     const text = `💳 Buyurtma №${order.number} to'landi — ${formatMoney(order.total as number)} (${label})${note ? `\n${note}` : ""}`;
     const sent = new Set<number>();
     for (const b of bots) {
-      if (b.ownerChatId && !sent.has(b.ownerChatId)) {
-        sent.add(b.ownerChatId);
-        await tg(b.token, "sendMessage", { chat_id: b.ownerChatId, text }).catch(() => undefined);
+      for (const id of [b.ownerChatId, ...b.adminChatIds]) {
+        if (id && !sent.has(id)) {
+          sent.add(id);
+          await tg(b.token, "sendMessage", { chat_id: id, text }).catch(() => undefined);
+        }
       }
     }
     const { data: s } = await db.from("shop_settings").select("group_chat_id, group_bot_project_id").eq("workspace_id", order.workspace_id).maybeSingle();

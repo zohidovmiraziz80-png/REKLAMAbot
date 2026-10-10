@@ -1,7 +1,7 @@
 import type { ActionDefinition } from "./define";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, connectBts, getBtsSetup, saveBtsSettings, connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
 import { getMetrics } from "./metrics";
-import { assignOrderCourier, getCourierSetup, removeCourier } from "./couriers";
+import { assignOrderCourier, getCourierSetup, removeCourier, saveOrderAdmins } from "./couriers";
 import { connectCrm, getCrmSetup } from "./crm";
 import { getAiSettings, saveAiSettings } from "./ai-assistant";
 import { getConversation, listConversations, sendChatReply } from "./chat";
@@ -140,6 +140,7 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   getCourierSetup,
   removeCourier,
   assignOrderCourier,
+  saveOrderAdmins,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,
