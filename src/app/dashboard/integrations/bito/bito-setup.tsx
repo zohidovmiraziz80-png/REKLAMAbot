@@ -25,7 +25,7 @@ export function BitoConnect() {
             Bito chap menyusida <b>Integratsiyalar → Integratsiyalar</b> ni oching.
           </li>
           <li>
-            <b>Custom integratsiya</b> → <b>Tashqi integratsiya</b> qatorida <b>+ Yaratish</b> → nom yozing (masalan &quot;TezDo&apos;kon&quot;) → <b>Saqlash</b>.
+            <b>Custom integratsiya</b> → <b>Tashqi integratsiya</b> qatorida <b>+ Yaratish</b> → nom yozing (masalan &quot;MIXBOT&quot;) → <b>Saqlash</b>.
           </li>
           <li>
             Chiqqan oynadagi <b>API Key</b> ni nusxalang (<code className="rounded bg-surface px-1">login:kalit</code> ko&apos;rinishida). Client ID va Secret kerak emas.

@@ -806,7 +806,7 @@ function SiteFooter({ site, basePath }: { site: Site; basePath: string }) {
   const f = site.footer;
   const variant = f?.variant ?? "simple";
   const contact = site.pages.flatMap((p) => p.blocks).find((b) => b.type === "contact");
-  const brand = <p className="text-xs opacity-70">TezDo&apos;kon yordamida yaratilgan</p>;
+  const brand = <p className="text-xs opacity-70">MIXBOT yordamida yaratilgan</p>;
   if (variant === "columns" || variant === "dark") {
     const dark = variant === "dark";
     return (

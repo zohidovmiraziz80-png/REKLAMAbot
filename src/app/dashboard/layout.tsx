@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { getActiveWorkspace } from "@/lib/workspace";
@@ -13,15 +14,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login?next=/dashboard");
 
   const workspace = await getActiveWorkspace(supabase, user.id);
-  const [plan, { data: isAdmin }] = await Promise.all([
+  const [plan, { data: isAdmin }, { count: newOrders }] = await Promise.all([
     workspace ? getWorkspacePlan(supabase, workspace.id) : Promise.resolve(null),
     supabase.rpc("is_platform_admin"),
+    workspace
+      ? supabase.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "new")
+      : Promise.resolve({ count: 0 }),
   ]);
   const userName = (user.user_metadata?.full_name as string | undefined) ?? user.email ?? "Foydalanuvchi";
 
   return (
-    <div className="min-h-dvh lg:flex">
-      <Sidebar userName={userName} workspaceName={workspace?.name ?? "Workspace"} isAdmin={isAdmin === true} />
+    <div className="min-h-dvh bg-[#f4f6fa] lg:flex">
+      <Suspense>
+        <Sidebar
+          userName={userName}
+          workspaceName={workspace?.name ?? "Do'kon"}
+          planName={plan ? `${plan.planName}${plan.status === "trial" ? " · sinov" : ""}` : undefined}
+          newOrders={newOrders ?? 0}
+          isAdmin={isAdmin === true}
+        />
+      </Suspense>
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
         {plan && plan.status !== "active" && (
           <div

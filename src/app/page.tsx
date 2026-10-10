@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 
 const FEATURES = [
-  { title: "AI bilan sayt", text: "Biznesingizni yozing — AI sahifalar, matnlar va dizaynni tayyorlaydi. Keyin o'zingiz tahrirlaysiz." },
+  { title: "Tayyor shablonlar", text: "Do'kon, gul, ovqat, xizmatlar uchun tayyor dizaynlar. Matn va rasmlarni o'zingiz bosib o'zgartirasiz." },
   { title: "Telegram bot", text: "Botingizni ulang: menyular, avtomatik javoblar va buyurtma qabul qilish." },
   { title: "Avtomatlashtirish", text: "Buyurtma keldi — xabar, mijoz bazaga, yetkazishga. Hammasi o'zi ishlaydi." },
   { title: "Savdo va CRM", text: "Mahsulotlar, buyurtmalar va mijozlar bir joyda. Bito va yetkazish xizmatlari bilan integratsiya." },
@@ -26,14 +26,13 @@ export default function HomePage() {
       <main className="mx-auto max-w-6xl px-4 pt-14 pb-20 sm:px-6 sm:pt-24">
         <section className="max-w-3xl">
           <p className="mb-4 inline-block rounded-full bg-accent-50 px-3 py-1 text-sm font-semibold text-accent-600">
-            ⚡ Tezkor onlayn savdo
+            ⚡ Savdo, sayt va botlar
           </p>
           <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
             Sayt, bot va savdoni bitta joydan boshqaring
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted text-pretty">
-            Nima kerakligini oddiy so&apos;z bilan yozing — platforma sayt yaratadi, Telegram botni sozlaydi va
-            buyurtmalarni avtomatlashtiradi.
+            Tayyor shablondan sayt yarating, Telegram botni ulang, Bito bilan bog&apos;lang va buyurtmalarni bitta joydan boshqaring.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/register" className="rounded-lg bg-accent-500 px-5 py-3 font-semibold text-white hover:bg-accent-600">

@@ -15,9 +15,9 @@ import {
 import { loadIntegration, type BitoSettings } from "./store";
 
 /**
- * Bito ↔ TezDo'kon sinxronlash.
- * 1) Mahsulotlar: Bito → TezDo'kon (nomi, narxi tanlangan narx turidan, qoldiq tanlangan ombordan, kategoriya, rasm).
- * 2) Buyurtmalar: TezDo'kon → Bito (mijoz telefon bo'yicha topiladi yoki yaratiladi, keyin sotuv buyurtmasi).
+ * Bito ↔ MIXBOT sinxronlash.
+ * 1) Mahsulotlar: Bito → MIXBOT (nomi, narxi tanlangan narx turidan, qoldiq tanlangan ombordan, kategoriya, rasm).
+ * 2) Buyurtmalar: MIXBOT → Bito (mijoz telefon bo'yicha topiladi yoki yaratiladi, keyin sotuv buyurtmasi).
  */
 
 export type SyncResult = { total: number; active: number; withoutPrice: number; ms: number };
@@ -232,7 +232,7 @@ export async function pushOrderToBito(db: SupabaseClient, orderId: string): Prom
     }
 
     const note = [
-      `TezDo'kon buyurtma №${order.number}`,
+      `MIXBOT buyurtma №${order.number}`,
       `Tel: ${formatUzPhone(order.phone as string)}`,
       `${DELIVERY_LABELS[order.delivery_method as keyof typeof DELIVERY_LABELS] ?? order.delivery_method}${order.address ? `: ${order.address}` : ""}`,
       Number(order.delivery_price) > 0 ? `Yetkazish: ${formatMoney(Number(order.delivery_price))}` : "",

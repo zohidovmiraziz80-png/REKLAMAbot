@@ -58,7 +58,7 @@ export function CreateProject({ defaultType }: { defaultType?: ProjectType }) {
         <form onSubmit={onSubmit} className="space-y-5 p-6">
           <div>
             <h2 className="text-lg font-semibold">Yangi loyiha</h2>
-            <p className="mt-1 text-sm text-muted">Nom va turini tanlang. Keyin uni AI bilan to&apos;ldirasiz.</p>
+            <p className="mt-1 text-sm text-muted">Nom va turini tanlang. Keyin shablon tanlab, o&apos;zingiz tahrirlaysiz.</p>
           </div>
 
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

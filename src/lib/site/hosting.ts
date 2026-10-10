@@ -4,7 +4,7 @@ import { getSiteUrl } from "@/lib/supabase/env";
 export const RESERVED_SLUGS = new Set([
   "www", "app", "api", "admin", "dashboard", "mail", "email", "smtp", "ftp", "cdn", "static", "assets",
   "help", "support", "docs", "blog", "status", "login", "register", "auth", "account", "billing",
-  "tezdokon", "platforma", "preview", "s", "test", "dev", "staging",
+  "tezdokon", "mixbot", "platforma", "preview", "s", "test", "dev", "staging",
 ]);
 
 export const SLUG_RE = /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/;
@@ -19,7 +19,7 @@ export function normalizeSlug(input: string) {
     .slice(0, 40);
 }
 
-/** Platformaning asosiy domeni (masalan tezdokon.uz). Bo'lmasa subdomenlar ishlamaydi. */
+/** Platformaning asosiy domeni (masalan mixbot.uz). Bo'lmasa subdomenlar ishlamaydi. */
 export function rootDomain() {
   const v = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase();
   return v ? v.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null;

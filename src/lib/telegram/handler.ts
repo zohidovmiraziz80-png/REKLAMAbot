@@ -131,7 +131,7 @@ async function handleGroupMessage(db: SupabaseClient, bot: BotRuntime, msg: TgMe
   if (!mm) return;
   const { data: s } = await db.from("shop_settings").select("group_link_code").eq("workspace_id", bot.workspace_id).maybeSingle();
   if (!s || s.group_link_code !== mm[1].toLowerCase()) {
-    await tg(bot.token, "sendMessage", { chat_id: msg.chat.id, text: "❌ Kod noto'g'ri. Kodni TezDo'kon → Buyurtmalar → Sozlamalar sahifasidan oling." }).catch(() => undefined);
+    await tg(bot.token, "sendMessage", { chat_id: msg.chat.id, text: "❌ Kod noto'g'ri. Kodni MIXBOT → Buyurtmalar → Sozlamalar sahifasidan oling." }).catch(() => undefined);
     return;
   }
   await db

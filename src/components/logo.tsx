@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** TezDo'kon belgisi: savat + chaqmoq + tezlik chiziqlari */
+/** MIXBOT belgisi: savat + chaqmoq + tezlik chiziqlari */
 export function LogoMark({ size = 36, className }: { size?: number; className?: string }) {
   return (
     <svg
@@ -8,7 +8,7 @@ export function LogoMark({ size = 36, className }: { size?: number; className?: 
       height={size}
       viewBox="0 0 48 48"
       role="img"
-      aria-label="TezDo'kon"
+      aria-label="MIXBOT"
       className={className}
     >
       <defs>
@@ -39,15 +39,15 @@ export function LogoMark({ size = 36, className }: { size?: number; className?: 
 
 export function Logo({ href = "/", withSlogan = false }: { href?: string; withSlogan?: boolean }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-2.5" aria-label="TezDo'kon — bosh sahifa">
+    <Link href={href} className="inline-flex items-center gap-2.5" aria-label="MIXBOT — bosh sahifa">
       <LogoMark size={withSlogan ? 44 : 36} />
       <span className="flex flex-col leading-none">
         <span className="text-xl font-extrabold tracking-tight">
-          <span className="text-brand-700">Tez</span>
-          <span className="text-accent-500">Do&apos;kon</span>
+          <span className="text-brand-700">MIX</span>
+          <span className="text-accent-500">BOT</span>
         </span>
         {withSlogan && (
-          <span className="mt-1 text-[11px] font-semibold tracking-wide text-muted uppercase">Tezkor onlayn savdo</span>
+          <span className="mt-1 text-[11px] font-semibold tracking-wide text-muted uppercase">Savdo, sayt va botlar</span>
         )}
       </span>
     </Link>

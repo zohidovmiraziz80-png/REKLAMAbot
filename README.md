@@ -1,4 +1,4 @@
-# TezDo'kon
+# MIXBOT
 
 AI yordamida sayt, Telegram bot va avtomatlashtirish yaratadigan SaaS platforma.
 Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
