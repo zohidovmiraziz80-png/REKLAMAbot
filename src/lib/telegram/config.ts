@@ -70,6 +70,19 @@ export const botConfigSchema = z.object({
   aiSite: z.boolean().catch(false),
   /** AI uchun qo'shimcha ma'lumot va ohang (ish vaqti, kafolat, yetkazish shartlari...) */
   aiInstructions: txt(2000),
+  /** Mahsulot postlari chiqadigan Telegram kanal */
+  postChannelId: z.number().nullable().catch(null),
+  postChannelTitle: txt(120),
+  autoPostNew: z.boolean().catch(false),
+  /** Do'kon kuryerlari (botga /start courier_<kod> orqali ulanadi) */
+  couriers: z
+    .array(z.object({ chatId: z.number(), name: txt(80, "Kuryer") }))
+    .catch([])
+    .transform((a) => a.slice(0, 30)),
+  /** Tashlab ketilgan savat eslatmasi */
+  abandonEnabled: z.boolean().catch(false),
+  abandonHours: z.number().min(1).max(48).catch(2),
+  abandonText: txt(500),
 });
 
 export type BotConfig = z.output<typeof botConfigSchema>;
@@ -90,6 +103,13 @@ export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig 
     aiBot: false,
     aiSite: false,
     aiInstructions: "",
+    postChannelId: null,
+    postChannelTitle: "",
+    autoPostNew: false,
+    couriers: [],
+    abandonEnabled: false,
+    abandonHours: 2,
+    abandonText: "",
   };
 }
 

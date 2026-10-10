@@ -11,6 +11,7 @@ import { dispatchYandex, estimateYandex } from "@/lib/delivery/yandex-flow";
 import { YandexError } from "@/lib/delivery/yandex";
 import { hasYandex, loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
 import { tg } from "./api";
+import { linkCode, updateBotConfig } from "./main-bot";
 import { withChatLink } from "./chat-link";
 import { botConfigSchema, buttonRows, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
 
@@ -232,6 +233,20 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     return;
   }
   if (update.channel_post) {
+    // Mahsulot postlari kanali: "/kanal KOD"
+    const t = (update.channel_post.text ?? "").trim();
+    const k = t.match(/^\/kanal(?:@\w+)?\s+([a-f0-9]{10})$/i);
+    if (k) {
+      const chat = update.channel_post.chat;
+      if (k[1].toLowerCase() === linkCode(bot.owner_link_code, "channel")) {
+        await updateBotConfig(db, bot.project_id, { postChannelId: chat.id, postChannelTitle: (chat.title ?? "").slice(0, 120) });
+        await tg(bot.token, "deleteMessage", { chat_id: chat.id, message_id: update.channel_post.message_id }).catch(() => undefined);
+        await tg(bot.token, "sendMessage", { chat_id: chat.id, text: "✅ Kanal MIXBOT'ga ulandi. Mahsulot va aksiya postlari shu yerga chiqadi." }).catch(() => undefined);
+      } else {
+        await tg(bot.token, "sendMessage", { chat_id: chat.id, text: "❌ Kod noto'g'ri. Kodni MIXBOT → Marketing → Telegram kanal bo'limidan oling." }).catch(() => undefined);
+      }
+      return;
+    }
     await handleChannelPost(db, bot, update.channel_post);
     return;
   }

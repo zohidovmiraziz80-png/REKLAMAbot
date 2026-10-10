@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { postProduct } from "@/lib/telegram/channel-post";
+import { loadMainBot } from "@/lib/telegram/main-bot";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ORDER_STATUSES, PAYMENT_STATUSES, type OrderItem, type OrderStatus, type PaymentStatus } from "@/lib/shop/format";
 import { notifyCustomerStatus } from "@/lib/shop/notify";
@@ -98,6 +100,16 @@ export const saveProduct = defineAction({
       : await ctx.supabase.from("products").insert({ ...row, workspace_id: ctx.workspaceId }).select(PRODUCT_COLUMNS).maybeSingle();
     if (error) throw new ActionError("internal", "Mahsulot saqlanmadi");
     if (!data) throw new ActionError("not_found", "Mahsulot topilmadi");
+    // Yangi mahsulot — sozlangan bo'lsa kanalga avtomatik post
+    if (!input.id && input.isActive) {
+      try {
+        const db = createAdminClient();
+        const bot = await loadMainBot(db, ctx.workspaceId);
+        if (bot?.config.autoPostNew && bot.config.postChannelId) await postProduct(db, ctx.workspaceId, (data as Product).id);
+      } catch {
+        // post chiqmasa ham mahsulot saqlangan
+      }
+    }
     return data as Product;
   },
 });

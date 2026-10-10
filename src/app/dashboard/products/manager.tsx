@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import type { Product } from "@/actions/shop";
 import { formatMoney } from "@/lib/shop/format";
 import { uploadImage } from "@/lib/upload-image";
-import { deleteProductAction, saveProductAction, setProductActiveAction } from "./actions";
+import { deleteProductAction, postProductAction, saveProductAction, setProductActiveAction } from "./actions";
 
 const input =
   "block w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -221,6 +221,22 @@ function ProductRow({
         </label>
         <button type="button" onClick={onEdit} className="rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-surface">
           Tahrirlash
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          title="Telegram kanalga post qilish"
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              const r = await postProductAction(p.id);
+              if (!r.ok) setError(r.error);
+              else setError("✅ Kanalga chiqdi");
+            })
+          }
+          className="rounded-md px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50"
+        >
+          📣 Kanalga
         </button>
         <button
           type="button"

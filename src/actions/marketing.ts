@@ -3,6 +3,9 @@ import { decryptSecret } from "@/lib/crypto";
 import { normalizeCode, type PromoRow } from "@/lib/shop/promo";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tg } from "@/lib/telegram/api";
+import { PostError, postCustom, postProduct } from "@/lib/telegram/channel-post";
+import { linkCode, loadMainBot, updateBotConfig } from "@/lib/telegram/main-bot";
+import { ensureWorkspaceWebhooks } from "@/lib/telegram/webhook";
 import { ActionError, defineAction } from "./define";
 import { logAudit } from "./audit";
 
@@ -165,5 +168,92 @@ export const sendBroadcastChunk = defineAction({
     const next = input.offset + (subs?.length ?? 0);
     if (input.offset === 0) await logAudit(ctx, "marketing.broadcast", { type: "project", id: input.botProjectId });
     return { sent, failed, total: count ?? 0, nextOffset: (subs?.length ?? 0) === CHUNK && next < (count ?? 0) ? next : null };
+  },
+});
+
+// ===== Telegram kanalga post =====
+
+export type ChannelInfo = { hasBot: boolean; botUsername: string | null; linked: boolean; title: string; code: string; autoPostNew: boolean };
+
+export const channelInfo = defineAction({
+  name: "channelInfo",
+  description: "Mahsulot postlari uchun Telegram kanal holati va ulash kodi.",
+  input: z.object({}),
+  handler: async (ctx): Promise<ChannelInfo> => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (!bot) return { hasBot: false, botUsername: null, linked: false, title: "", code: "", autoPostNew: false };
+    // Kanal xabarlarini olish uchun webhook yangilanadi
+    await ensureWorkspaceWebhooks(db, ctx.workspaceId);
+    return {
+      hasBot: true,
+      botUsername: bot.username,
+      linked: !!bot.config.postChannelId,
+      title: bot.config.postChannelTitle,
+      code: linkCode(bot.linkCode, "channel"),
+      autoPostNew: bot.config.autoPostNew,
+    };
+  },
+});
+
+export const setAutoPost = defineAction({
+  name: "setAutoPost",
+  description: "Yangi qo'shilgan mahsulotni kanalga avtomatik chiqarishni yoqadi/o'chiradi.",
+  input: z.object({ enabled: z.boolean() }),
+  minRole: "admin",
+  handler: async (ctx, input) => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (!bot) throw new ActionError("validation", "Avval Telegram botni ulang");
+    await updateBotConfig(db, bot.projectId, { autoPostNew: input.enabled });
+    return { ok: true };
+  },
+});
+
+export const unlinkPostChannel = defineAction({
+  name: "unlinkPostChannel",
+  description: "Mahsulot postlari kanalini uzadi.",
+  input: z.object({}),
+  minRole: "admin",
+  handler: async (ctx) => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (bot) await updateBotConfig(db, bot.projectId, { postChannelId: null, postChannelTitle: "", autoPostNew: false });
+    return { ok: true };
+  },
+});
+
+async function wrapPost<T>(fn: () => Promise<T>) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof PostError) throw new ActionError("validation", err.message);
+    throw err;
+  }
+}
+
+export const postProductToChannel = defineAction({
+  name: "postProductToChannel",
+  description: "Mahsulotni rasm, narx va «Buyurtma berish» tugmasi bilan Telegram kanalga chiqaradi.",
+  input: z.object({ productId: z.string().uuid() }),
+  handler: async (ctx, input) => {
+    await wrapPost(() => postProduct(createAdminClient(), ctx.workspaceId, input.productId));
+    return { ok: true };
+  },
+});
+
+export const postToChannel = defineAction({
+  name: "postToChannel",
+  description: "Kanalga ixtiyoriy aksiya/e'lon posti (matn, rasm havolasi, tugma).",
+  input: z.object({
+    text: z.string().trim().min(1).max(1000),
+    imageUrl: z.string().trim().max(500).default(""),
+    buttonText: z.string().trim().max(40).default(""),
+    buttonUrl: z.string().trim().max(500).default(""),
+  }),
+  minRole: "admin",
+  handler: async (ctx, input) => {
+    await wrapPost(() => postCustom(createAdminClient(), ctx.workspaceId, input));
+    return { ok: true };
   },
 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
 import { deleteProduct, saveProduct, setProductActive } from "@/actions/shop";
+import { postProductToChannel } from "@/actions/marketing";
 
 export async function saveProductAction(input: unknown) {
   const r = await runAction(saveProduct, input);
@@ -19,4 +20,8 @@ export async function deleteProductAction(id: string) {
   const r = await runAction(deleteProduct, { id }, { confirmed: true });
   if (r.ok) revalidatePath("/dashboard/products");
   return r;
+}
+
+export async function postProductAction(productId: string) {
+  return runAction(postProductToChannel, { productId });
 }

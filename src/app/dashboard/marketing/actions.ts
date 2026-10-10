@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
-import { deletePromo, savePromo, sendBroadcastChunk, sendBroadcastTest, setPromoActive } from "@/actions/marketing";
+import { deletePromo, postToChannel, savePromo, sendBroadcastChunk, sendBroadcastTest, setAutoPost, setPromoActive, unlinkPostChannel } from "@/actions/marketing";
 
 type Msg = { botProjectId: string; text: string; buttonText: string; buttonUrl: string };
 
@@ -31,4 +31,20 @@ export async function deletePromoAction(id: string) {
   const r = await runAction(deletePromo, { id }, { confirmed: true });
   if (r.ok) revalidatePath("/dashboard/marketing");
   return r;
+}
+
+export async function setAutoPostAction(enabled: boolean) {
+  const r = await runAction(setAutoPost, { enabled });
+  if (r.ok) revalidatePath("/dashboard/marketing");
+  return r;
+}
+
+export async function unlinkPostChannelAction() {
+  const r = await runAction(unlinkPostChannel, {});
+  if (r.ok) revalidatePath("/dashboard/marketing");
+  return r;
+}
+
+export async function postToChannelAction(input: { text: string; imageUrl: string; buttonText: string; buttonUrl: string }) {
+  return runAction(postToChannel, input);
 }
