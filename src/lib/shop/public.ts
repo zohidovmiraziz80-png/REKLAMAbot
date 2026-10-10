@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { maybeAutoSyncBito } from "@/lib/integrations/bito-sync";
+import { enabledPayMethods } from "@/lib/payments/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ShopData } from "./types";
 
@@ -31,13 +32,14 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
     }
     return rows;
   };
-  const [products, { data: s }] = await Promise.all([
+  const [products, { data: s }, payMethods] = await Promise.all([
     loadProducts(),
     db
       .from("shop_settings")
-      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order")
+      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, cash_enabled")
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
+    enabledPayMethods(db, workspaceId),
   ]);
 
   // Bito ulangan bo'lsa — narx va qoldiq 3 soatdan eski bo'lsa, javobdan keyin fonda yangilanadi
@@ -72,6 +74,8 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
       deliveryPrice: Number(s?.delivery_price ?? 0),
       freeDeliveryFrom: s?.free_delivery_from == null ? null : Number(s.free_delivery_from),
       minOrder: Number(s?.min_order ?? 0),
+      cashEnabled: s?.cash_enabled !== false || payMethods.length === 0,
+      payMethods,
     },
   };
 }

@@ -2,6 +2,9 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { decryptSecret } from "@/lib/crypto";
 import { pushOrderToBito } from "@/lib/integrations/bito-sync";
+import { loadPayConfigs } from "@/lib/payments/config";
+import { clickCheckoutUrl, multicardCheckoutUrl, paymeCheckoutUrl } from "@/lib/payments/core";
+import { getSiteUrl } from "@/lib/supabase/env";
 import { normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
 import { ORDER_COLUMNS, notifyNewOrder, type OrderRow } from "@/lib/shop/notify";
@@ -29,6 +32,8 @@ const body = z.object({
   comment: z.string().trim().max(500).default(""),
   initData: z.string().max(4096).default(""),
   tgLink: z.object({ bot: z.string().max(64), chat: z.string().max(64) }).nullable().default(null),
+  payment: z.enum(["cash", "payme", "click", "multicard"]).default("cash"),
+  returnUrl: z.string().max(500).default(""),
 });
 
 function fail(error: string, status = 400) {
@@ -75,6 +80,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const plan = await getWorkspacePlan(db, workspaceId);
   if (!plan.allowSites) return fail("Do'kon hozircha buyurtma qabul qilmayapti", 403);
+
+  // To'lov usuli: onlayn bo'lsa — shu do'konda ulangan bo'lishi kerak
+  const payConfigs = await loadPayConfigs(db, workspaceId);
+  if (input.payment !== "cash" && !payConfigs[input.payment]) return fail("Bu to'lov usuli hozir mavjud emas");
+  if (input.payment === "cash") {
+    const { data: cs } = await db.from("shop_settings").select("cash_enabled").eq("workspace_id", workspaceId).maybeSingle();
+    if (cs && cs.cash_enabled === false) return fail("Iltimos, onlayn to'lov usulini tanlang");
+  }
 
   // Oddiy himoya: bir raqamdan 2 daqiqada 3 tadan ko'p buyurtma bo'lmasin
   const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
@@ -147,6 +160,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const result = created as { id: string; number: number; total: number };
+  if (input.payment !== "cash") await db.from("orders").update({ payment_method: input.payment }).eq("id", result.id);
+
+  // Onlayn to'lov havolasi
+  let payUrl: string | null = null;
+  let payError: string | null = null;
+  if (input.payment !== "cash") {
+    // To'lovdan keyin mijoz qaytadigan sahifa: buyurtma berilgan sahifaning o'zi (o'z domeni ham ishlaydi)
+    const origin = request.headers.get("origin") || getSiteUrl();
+    let ret = `${origin.replace(/\/$/, "")}/s/${slug}?order=${result.number}`;
+    try {
+      const u = new URL(input.returnUrl);
+      if (u.protocol === "https:" && u.origin === origin) ret = `${u.origin}${u.pathname}?order=${result.number}`;
+    } catch {
+      // standart manzil qoladi
+    }
+    try {
+      if (input.payment === "payme" && payConfigs.payme) payUrl = paymeCheckoutUrl(payConfigs.payme, result.id, Number(result.total), ret);
+      else if (input.payment === "click" && payConfigs.click) payUrl = clickCheckoutUrl(payConfigs.click, result.id, Number(result.total), ret);
+      else if (input.payment === "multicard" && payConfigs.multicard)
+        payUrl = await multicardCheckoutUrl(
+          db,
+          payConfigs.multicard,
+          { id: result.id, workspace_id: workspaceId, number: result.number, total: Number(result.total) },
+          ret,
+          `${getSiteUrl()}/api/pay/multicard/${workspaceId}`,
+        );
+    } catch (err) {
+      payError = err instanceof Error ? err.message : "To'lov havolasi yaratilmadi";
+      console.error("To'lov havolasi xatosi:", payError);
+    }
+  }
 
   // Telegram xabarlari (javobni kechiktirmaslik uchun xatolar yutiladi)
   const [{ data: order }, { data: settings }] = await Promise.all([
@@ -164,5 +208,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   });
 
-  return NextResponse.json({ ok: true, number: result.number, total: result.total, telegram: !!tgUser });
+  return NextResponse.json({
+    ok: true,
+    number: result.number,
+    total: result.total,
+    telegram: !!tgUser,
+    payUrl,
+    payError: payError ? "Onlayn to'lov havolasini ochib bo'lmadi. Buyurtma qabul qilindi — siz bilan bog'lanamiz." : null,
+  });
 }

@@ -21,6 +21,10 @@ export type PublicShopSettings = {
   deliveryPrice: number;
   freeDeliveryFrom: number | null;
   minOrder: number;
+  /** Naqd (qabul qilganda) to'lov yoqilganmi */
+  cashEnabled: boolean;
+  /** Ulangan onlayn to'lov usullari */
+  payMethods: ("payme" | "click" | "multicard")[];
 };
 
 export type ShopData = {

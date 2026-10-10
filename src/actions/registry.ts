@@ -2,8 +2,10 @@ import type { ActionDefinition } from "./define";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
 import {
   connectBito,
+  connectPayProvider,
   disconnectIntegration,
   getBitoSetup,
+  getPaySetup,
   listIntegrations,
   retryOrderSync,
   saveBitoSettings,
@@ -77,6 +79,8 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   syncBitoNow,
   retryOrderSync,
   disconnectIntegration,
+  getPaySetup,
+  connectPayProvider,
 ];
 
 export function getAction(name: string) {

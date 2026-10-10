@@ -196,6 +196,15 @@ export function ShopSection({
   const [category, setCategory] = useState<string>("");
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(48);
+  const [returnedOrder, setReturnedOrder] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const n = new URLSearchParams(window.location.search).get("order");
+      if (n && /^\d{1,9}$/.test(n)) setReturnedOrder(n);
+    } catch {
+      // e'tiborsiz
+    }
+  }, []);
   const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
@@ -299,6 +308,12 @@ export function ShopSection({
           <div className={left ? "" : "text-center"}>
             {heading && <h2 className="text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{headingNode ?? heading}</h2>}
             {subheading && <p className={`mt-2 max-w-2xl text-[color:var(--s-muted)] ${left ? "" : "mx-auto"}`}>{subheadingNode ?? subheading}</p>}
+          </div>
+        )}
+
+        {returnedOrder && (
+          <div className="s-card mx-auto mt-6 max-w-md rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-4 py-3 text-center text-sm">
+            ✅ Buyurtma №{returnedOrder} qabul qilindi. To&apos;lov tasdiqlangach sizga xabar beramiz.
           </div>
         )}
 
@@ -517,6 +532,8 @@ function CartDrawer({
   const [delivery, setDelivery] = useState<"pickup" | "courier">(s.deliveryEnabled && !s.pickupEnabled ? "courier" : "pickup");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
+  const payOptions: ("cash" | "payme" | "click" | "multicard")[] = [...(s.cashEnabled ? (["cash"] as const) : []), ...s.payMethods];
+  const [payment, setPayment] = useState<"cash" | "payme" | "click" | "multicard">(payOptions[0] ?? "cash");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState<{ number: number; total: number } | null>(null);
@@ -553,9 +570,18 @@ function CartDrawer({
           comment,
           initData: webApp()?.initData ?? "",
           tgLink: telegramLink(),
+          payment,
+          returnUrl: window.location.href.split("?")[0],
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; number?: number; total?: number };
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        number?: number;
+        total?: number;
+        payUrl?: string | null;
+        payError?: string | null;
+      };
       if (!data.ok) {
         setError(data.error ?? "Buyurtma yuborilmadi. Qayta urinib ko'ring.");
         webApp()?.HapticFeedback?.notificationOccurred("error");
@@ -563,6 +589,12 @@ function CartDrawer({
       }
       setDone({ number: data.number ?? 0, total: data.total ?? total });
       onClear();
+      if (data.payUrl) {
+        // To'lov sahifasiga o'tamiz (Telegram ichida ham shu oynada ochiladi)
+        window.location.href = data.payUrl;
+        return;
+      }
+      if (data.payError) setError(data.payError);
       onStep("done");
       webApp()?.HapticFeedback?.notificationOccurred("success");
     } catch {
@@ -710,7 +742,23 @@ function CartDrawer({
                     <span>Jami</span>
                     <span>{formatMoney(total)}</span>
                   </div>
-                  <p className="pt-1 text-xs text-[color:var(--s-muted)]">To&apos;lov: qabul qilganda naqd yoki karta orqali</p>
+                </div>
+
+                <div>
+                  <span className="mb-1 block text-sm font-medium">To&apos;lov usuli</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {payOptions.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setPayment(m)}
+                        className={`rounded-[calc(var(--s-radius)*0.6)] border px-3 py-2.5 text-left text-sm ${payment === m ? "border-[color:var(--s-accent)] font-semibold" : "border-[color:var(--s-line)]"}`}
+                      >
+                        {m === "cash" ? "💵 Qabul qilganda" : m === "payme" ? "Payme" : m === "click" ? "Click" : "Multicard"}
+                        <span className="block text-xs font-normal text-[color:var(--s-muted)]">{m === "cash" ? "Naqd yoki karta" : "Onlayn, karta bilan"}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {error && <p className="rounded-[calc(var(--s-radius)*0.6)] bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -720,7 +768,7 @@ function CartDrawer({
                     ←
                   </button>
                   <button type="submit" disabled={sending} className={`${btnAccent} flex-1 py-3`}>
-                    {sending ? "Yuborilmoqda…" : `Buyurtma berish · ${formatMoney(total)}`}
+                    {sending ? "Yuborilmoqda…" : payment === "cash" ? `Buyurtma berish · ${formatMoney(total)}` : `To'lash · ${formatMoney(total)}`}
                   </button>
                 </div>
               </form>

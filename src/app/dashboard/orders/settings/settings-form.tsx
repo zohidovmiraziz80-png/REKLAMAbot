@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { ShopSettings } from "@/actions/shop";
 import { saveShopSettingsAction } from "../actions";
@@ -30,6 +31,7 @@ export function SettingsForm({ initial }: { initial: ShopSettings }) {
   const [freeFrom, setFreeFrom] = useState(initial.free_delivery_from === null ? "" : String(initial.free_delivery_from));
   const [minOrder, setMinOrder] = useState(String(initial.min_order ?? 0));
   const [thanks, setThanks] = useState(initial.order_thanks);
+  const [cash, setCash] = useState(initial.cash_enabled ?? true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -46,6 +48,7 @@ export function SettingsForm({ initial }: { initial: ShopSettings }) {
         freeDeliveryFrom: freeFrom ? Number(freeFrom) : null,
         minOrder: Number(minOrder || 0),
         orderThanks: thanks,
+        cashEnabled: cash,
       });
       setMsg(r.ok ? { ok: true, text: "Saqlandi" } : { ok: false, text: r.error });
     });
@@ -103,7 +106,14 @@ export function SettingsForm({ initial }: { initial: ShopSettings }) {
         </button>
         {msg && <span className={`text-sm ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span>}
       </div>
-      <p className="text-xs text-muted">Onlayn to&apos;lov (Payme, Click, Multicard) keyingi bosqichda qo&apos;shiladi. Hozircha to&apos;lov qabul qilganda.</p>
+      <div className="space-y-2 border-t border-line pt-5">
+        <Toggle checked={cash} onChange={setCash} label="💵 Qabul qilganda to'lash (naqd yoki karta)" hint="O'chirsangiz, mijoz faqat onlayn to'laydi (Payme/Click/Multicard ulangan bo'lishi kerak)" />
+        <p className="pl-7 text-xs text-muted">
+          Onlayn to&apos;lov: <Link href="/dashboard/integrations/payme" className="text-brand-600 hover:underline">Payme</Link> ·{" "}
+          <Link href="/dashboard/integrations/click" className="text-brand-600 hover:underline">Click</Link> ·{" "}
+          <Link href="/dashboard/integrations/multicard" className="text-brand-600 hover:underline">Multicard</Link>
+        </p>
+      </div>
     </form>
   );
 }

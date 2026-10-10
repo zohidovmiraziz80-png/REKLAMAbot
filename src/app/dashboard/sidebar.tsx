@@ -101,8 +101,10 @@ function groups(newOrders: number): Group[] {
           label: "To'lovlar",
           icon: "payments",
           children: [
-            { label: "Tarif", href: "/dashboard/plan" },
-            { label: "Onlayn to'lov", href: "/dashboard/payments", soon: true },
+            { label: "Payme", href: "/dashboard/integrations/payme" },
+            { label: "Click", href: "/dashboard/integrations/click" },
+            { label: "Multicard", href: "/dashboard/integrations/multicard" },
+            { label: "MIXBOT tarifi", href: "/dashboard/plan" },
           ],
         },
         { label: "Xodimlar", icon: "staff", href: "/dashboard/staff", soon: true },

@@ -27,7 +27,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql` → `..._bots.sql` → `..._plans.sql` → `..._commerce.sql` → `..._integrations.sql`) joylab **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql` → `..._bots.sql` → `..._plans.sql` → `..._commerce.sql` → `..._integrations.sql` → `..._payments.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari

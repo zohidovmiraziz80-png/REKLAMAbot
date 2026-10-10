@@ -14,7 +14,9 @@ import {
 } from "@/lib/integrations/bito";
 import { pushOrderToBito, syncBitoProducts, type SyncResult } from "@/lib/integrations/bito-sync";
 import { bitoSettingsSchema, encryptCreds, keyHint, loadIntegration, type BitoSettings } from "@/lib/integrations/store";
+import { clickSettings, multicardSettings, paymeSettings, type PayProvider } from "@/lib/payments/config";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSiteUrl } from "@/lib/supabase/env";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
 
@@ -249,6 +251,89 @@ export const disconnectIntegration = defineAction({
     const { error } = await db.from("integrations").delete().eq("workspace_id", ctx.workspaceId).eq("provider", input.provider);
     if (error) throw new ActionError("internal", "Uzib bo'lmadi");
     await logAudit(ctx, "integration.disconnect", { type: "integration", id: input.provider });
+    return { ok: true };
+  },
+});
+
+// ===== Onlayn to'lov tizimlari (Payme, Click, Multicard) =====
+
+export type PaySetup = {
+  provider: PayProvider;
+  connected: boolean;
+  status: string | null;
+  keyHint: string | null;
+  settings: Record<string, unknown> | null;
+  callbackUrl: string;
+  workspaceId: string;
+};
+
+export const getPaySetup = defineAction({
+  name: "getPaySetup",
+  description: "Payme/Click/Multicard ulanish holati va to'lov tizimi kabinetiga qo'yiladigan callback manzil.",
+  input: z.object({ provider: z.enum(["payme", "click", "multicard"]) }),
+  handler: async (ctx, input): Promise<PaySetup> => {
+    const { data } = await ctx.supabase
+      .from("integrations")
+      .select("status, key_hint, settings")
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("provider", input.provider)
+      .maybeSingle();
+    return {
+      provider: input.provider,
+      connected: !!data,
+      status: (data?.status as string | undefined) ?? null,
+      keyHint: (data?.key_hint as string | undefined) ?? null,
+      settings: (data?.settings as Record<string, unknown> | undefined) ?? null,
+      callbackUrl: `${getSiteUrl()}/api/pay/${input.provider}/${ctx.workspaceId}`,
+      workspaceId: ctx.workspaceId,
+    };
+  },
+});
+
+export const connectPayProvider = defineAction({
+  name: "connectPayProvider",
+  description: "Payme, Click yoki Multicard'ni ulaydi. Maxfiy kalit shifrlanib saqlanadi; bo'sh qoldirilsa avvalgisi saqlanadi.",
+  input: z.object({
+    provider: z.enum(["payme", "click", "multicard"]),
+    settings: z.record(z.unknown()),
+    secret: z.string().trim().max(300).default(""),
+  }),
+  minRole: "admin",
+  handler: async (ctx, input) => {
+    if (!isEncryptionConfigured()) throw new ActionError("internal", "Server shifrlash kaliti sozlanmagan");
+    const schema = input.provider === "payme" ? paymeSettings : input.provider === "click" ? clickSettings : multicardSettings;
+    const parsed = schema.safeParse(input.settings);
+    if (!parsed.success) throw new ActionError("validation", parsed.error.issues[0]?.message ?? "Ma'lumot noto'g'ri");
+
+    const db = createAdminClient();
+    const { data: existing } = await db
+      .from("integrations")
+      .select("credentials_encrypted, key_hint")
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("provider", input.provider)
+      .maybeSingle();
+    if (!input.secret && !existing) throw new ActionError("validation", "Maxfiy kalitni kiriting");
+    if (input.secret && input.secret.length < 6) throw new ActionError("validation", "Kalit juda qisqa");
+
+    const credField = input.provider === "payme" ? "key" : input.provider === "click" ? "secretKey" : "secret";
+    const row: Record<string, unknown> = {
+      workspace_id: ctx.workspaceId,
+      provider: input.provider,
+      status: "active",
+      settings: parsed.data,
+      last_error: null,
+      created_by: ctx.user.id,
+    };
+    if (input.secret) {
+      row.credentials_encrypted = encryptCreds({ [credField]: input.secret });
+      row.key_hint = keyHint(input.secret);
+    } else {
+      row.credentials_encrypted = existing!.credentials_encrypted;
+      row.key_hint = existing!.key_hint;
+    }
+    const { error } = await db.from("integrations").upsert(row, { onConflict: "workspace_id,provider" });
+    if (error) throw new ActionError("internal", "Saqlanmadi");
+    await logAudit(ctx, "integration.connect", { type: "integration", id: input.provider });
     return { ok: true };
   },
 });

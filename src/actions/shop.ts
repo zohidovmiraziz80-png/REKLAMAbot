@@ -316,6 +316,7 @@ export type ShopSettings = {
   free_delivery_from: number | null;
   min_order: number;
   order_thanks: string;
+  cash_enabled: boolean;
   group_link_code: string | null;
   group_chat_id: number | null;
   group_title: string | null;
@@ -330,6 +331,7 @@ export const DEFAULT_SHOP_SETTINGS: ShopSettings = {
   free_delivery_from: null,
   min_order: 0,
   order_thanks: "",
+  cash_enabled: true,
   group_link_code: null,
   group_chat_id: null,
   group_title: null,
@@ -342,7 +344,7 @@ export const getShopSettings = defineAction({
   handler: async (ctx): Promise<{ settings: ShopSettings; bots: { username: string }[] }> => {
     let { data } = await ctx.supabase
       .from("shop_settings")
-      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, order_thanks, group_link_code, group_chat_id, group_title")
+      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, order_thanks, cash_enabled, group_link_code, group_chat_id, group_title")
       .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
     if (!data) {
@@ -350,7 +352,7 @@ export const getShopSettings = defineAction({
       await ctx.supabase.from("shop_settings").insert({ workspace_id: ctx.workspaceId });
       ({ data } = await ctx.supabase
         .from("shop_settings")
-        .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, order_thanks, group_link_code, group_chat_id, group_title")
+        .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, order_thanks, cash_enabled, group_link_code, group_chat_id, group_title")
         .eq("workspace_id", ctx.workspaceId)
         .maybeSingle());
     }
@@ -372,6 +374,7 @@ export const saveShopSettings = defineAction({
       freeDeliveryFrom: money.nullable().default(null),
       minOrder: money,
       orderThanks: z.string().trim().max(500).default(""),
+      cashEnabled: z.boolean().default(true),
     })
     .refine((v) => v.pickupEnabled || v.deliveryEnabled, { message: "Kamida bitta usul (olib ketish yoki yetkazish) yoqilgan bo'lsin" }),
   minRole: "admin",
@@ -385,6 +388,7 @@ export const saveShopSettings = defineAction({
       free_delivery_from: input.freeDeliveryFrom,
       min_order: input.minOrder,
       order_thanks: input.orderThanks,
+      cash_enabled: input.cashEnabled,
     };
     const { data: existing } = await ctx.supabase.from("shop_settings").select("workspace_id").eq("workspace_id", ctx.workspaceId).maybeSingle();
     const { error } = existing
