@@ -63,6 +63,9 @@ export async function middleware(request: NextRequest) {
 
   const isPlatform = platformHosts().has(host) || host.endsWith(".vercel.app");
 
+  // Ommaviy do'kon API'si (buyurtma) har qanday domendan, sessiyasiz ishlaydi
+  if (path.startsWith("/api/shop/")) return NextResponse.next();
+
   if (!isPlatform) {
     // <slug>.<asosiy-domen>
     if (ROOT && host.endsWith(`.${ROOT}`)) {

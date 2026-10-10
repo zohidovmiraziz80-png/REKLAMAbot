@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { runAction } from "@/actions/run";
 import { getWebsite } from "@/actions/websites";
 import { SiteRenderer } from "@/components/site/renderer";
+import { loadShopData } from "@/lib/shop/public";
+import { createClient } from "@/lib/supabase/server";
 
 type Params = Promise<{ id: string; slug?: string[] }>;
 
@@ -21,6 +23,10 @@ export default async function PreviewPage({ params }: { params: Params }) {
   const page = site.pages.find((p) => p.slug === pageSlug);
   if (!page) notFound();
 
+  const supabase = await createClient();
+  const { data: project } = await supabase.from("projects").select("workspace_id").eq("id", id).maybeSingle();
+  const shop = project ? await loadShopData(project.workspace_id as string, "preview", { preview: true }) : null;
+
   return (
     <div className="min-h-dvh">
       <div className="flex items-center justify-between gap-3 bg-ink px-4 py-2 text-xs text-white">
@@ -29,7 +35,7 @@ export default async function PreviewPage({ params }: { params: Params }) {
           Tahrirlashga qaytish
         </Link>
       </div>
-      <SiteRenderer site={site} page={page} basePath={`/preview/${id}`} />
+      <SiteRenderer site={site} page={page} basePath={`/preview/${id}`} shop={shop ?? undefined} />
     </div>
   );
 }

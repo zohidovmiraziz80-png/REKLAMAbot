@@ -1,11 +1,13 @@
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import type { Block, Site, SitePage } from "@/lib/site/schema";
 import { instagramUrl, phoneUrl, safeHref, telegramUrl } from "@/lib/site/safe";
+import type { ShopData } from "@/lib/shop/types";
+import { ShopPlaceholder, ShopSection } from "./shop";
 
 /**
  * Sayt tuzilmasini (JSON) xavfsiz React komponentlarga aylantiradi.
  * HTML hech qachon to'g'ridan-to'g'ri qo'yilmaydi — faqat matn sifatida chiqadi.
- * Server va brauzerda ishlaydi (hook'lar yo'q).
+ * Server va brauzerda ishlaydi (hook'lar yo'q; do'kon bloki alohida client komponent).
  */
 
 const FONTS: Record<Site["theme"]["font"], string> = {
@@ -60,13 +62,21 @@ function anchorFor(block: Block, firstOfType: boolean) {
   if (!firstOfType) return block.id;
   if (block.type === "contact") return "aloqa";
   if (block.type === "products") return "mahsulotlar";
+  if (block.type === "shop") return "katalog";
   if (block.type === "faq") return "savollar";
   if (block.type === "about") return "biz-haqimizda";
   return block.id;
 }
 
-function BlockView({ block, basePath, anchor }: { block: Block; basePath: string; anchor: string }) {
+function BlockView({ block, basePath, anchor, shop }: { block: Block; basePath: string; anchor: string; shop?: ShopData }) {
   switch (block.type) {
+    case "shop":
+      return shop ? (
+        <ShopSection shop={shop} heading={block.heading} subheading={block.subheading} anchor={anchor} />
+      ) : (
+        <ShopPlaceholder heading={block.heading} subheading={block.subheading} anchor={anchor} />
+      );
+
     case "hero":
       return (
         <section id={anchor} className="bg-[color:var(--s-primary)] text-white">
@@ -251,13 +261,19 @@ export function SiteRenderer({
   site,
   page,
   basePath = "",
+  shop,
 }: {
   site: Site;
   page: SitePage;
   /** Sahifalararo havolalar uchun prefiks, masalan /preview/<id> */
   basePath?: string;
+  /** Jonli do'kon ma'lumotlari (nashr qilingan sayt va ko'rib chiqishda) */
+  shop?: ShopData;
 }) {
   const seen = new Set<string>();
+  // Saytda "Do'kon" bloki bo'lmasa, mahsulotlar bor bo'lsa ham bosh sahifada katalog avtomatik chiqadi
+  const hasShopBlock = site.pages.some((p) => p.blocks.some((b) => b.type === "shop"));
+  const autoShop = !!shop && shop.products.length > 0 && !hasShopBlock && page.slug === "home";
   const contact = site.pages.flatMap((p) => p.blocks).find((b) => b.type === "contact");
   const contactHref = contact ? (page.blocks.includes(contact) ? "#aloqa" : `${basePath}/${site.pages.find((p) => p.blocks.includes(contact))?.slug}#aloqa`) : undefined;
 
@@ -289,11 +305,17 @@ export function SiteRenderer({
       </header>
 
       <main>
-        {page.blocks.map((block) => {
+        {page.blocks.map((block, i) => {
           const first = !seen.has(block.type);
           seen.add(block.type);
-          return <BlockView key={block.id} block={block} basePath={basePath} anchor={anchorFor(block, first)} />;
+          return (
+            <Fragment key={block.id}>
+              <BlockView block={block} basePath={basePath} anchor={anchorFor(block, first)} shop={shop} />
+              {autoShop && i === 0 && <ShopSection shop={shop!} heading="Katalog" subheading="" anchor="katalog" />}
+            </Fragment>
+          );
         })}
+        {autoShop && page.blocks.length === 0 && <ShopSection shop={shop!} heading="Katalog" subheading="" anchor="katalog" />}
       </main>
 
       <footer className="border-t border-[color:var(--s-line)] py-8 text-center text-sm text-[color:var(--s-muted)]">

@@ -57,6 +57,22 @@ async function publishedSites(ctx: ActionContext) {
 }
 
 /** Xabar maydoni yonidagi menyu tugmasini Mini App'ga yoki oddiy buyruqlar menyusiga o'rnatadi */
+/** Bot qabul qiladigan Telegram yangilanishlari (callback_query — buyurtma tugmalari uchun) */
+const ALLOWED_UPDATES = ["message", "callback_query"];
+
+/** Avval faqat "message" bilan ulangan botlarning webhook'ini yangilaydi (manzil va kalit o'zgarmaydi) */
+async function ensureWebhookUpdates(token: string, projectId: string, secret: string) {
+  const info = await tg<{ url?: string; allowed_updates?: string[]; ip_address?: string }>(token, "getWebhookInfo");
+  if (!info.url || ALLOWED_UPDATES.every((u) => info.allowed_updates?.includes(u))) return;
+  await tg(token, "setWebhook", {
+    url: `${getSiteUrl()}/api/telegram/${projectId}`,
+    secret_token: secret,
+    allowed_updates: ALLOWED_UPDATES,
+    max_connections: 20,
+    ...(info.ip_address ? { ip_address: info.ip_address } : {}),
+  });
+}
+
 async function syncMenuButton(token: string, config: BotConfig) {
   const url = safeWebAppUrl(config.siteUrl);
   await tg(token, "setChatMenuButton", {
@@ -181,7 +197,7 @@ export const connectBot = defineAction({
     const webhook = {
       url: `${getSiteUrl()}/api/telegram/${project.id}`,
       secret_token: webhookSecret,
-      allowed_updates: ["message"],
+      allowed_updates: ALLOWED_UPDATES,
       drop_pending_updates: true,
       max_connections: 20,
     };
@@ -257,16 +273,22 @@ export const saveBotConfig = defineAction({
       .from("bots")
       .update({ config })
       .eq("project_id", project.id)
-      .select("token_encrypted")
+      .select("token_encrypted, webhook_secret")
       .maybeSingle();
     if (error) throw new ActionError("internal", "Sozlamalar saqlanmadi");
     if (!data) throw new ActionError("not_found", "Avval botni ulang");
 
     let menuButtonSynced = true;
+    const token = decryptSecret(data.token_encrypted as string);
     try {
-      await syncMenuButton(decryptSecret(data.token_encrypted as string), config);
+      await syncMenuButton(token, config);
     } catch {
       menuButtonSynced = false;
+    }
+    try {
+      await ensureWebhookUpdates(token, project.id, data.webhook_secret as string);
+    } catch {
+      // keyingi saqlashda qayta urinadi
     }
     await logAudit(ctx, "bot.config", { type: "project", id: project.id });
     return { config, menuButtonSynced };

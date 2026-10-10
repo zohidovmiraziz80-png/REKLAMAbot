@@ -1,0 +1,531 @@
+"use client";
+
+import Script from "next/script";
+import { useEffect, useMemo, useState } from "react";
+import { formatMoney } from "@/lib/shop/format";
+import type { PublicProduct, ShopData } from "@/lib/shop/types";
+
+/**
+ * Saytdagi jonli do'kon: katalog, savat va buyurtma berish.
+ * Telegram Mini App ichida ochilsa, mijoz Telegram orqali tanib olinadi (initData serverda tekshiriladi).
+ */
+
+type TgWebApp = {
+  initData: string;
+  platform?: string;
+  initDataUnsafe?: { user?: { first_name?: string; last_name?: string } };
+  ready: () => void;
+  expand: () => void;
+  close: () => void;
+  HapticFeedback?: { impactOccurred: (s: string) => void; notificationOccurred: (s: string) => void };
+};
+
+/** Telegram ichida ochilganmi (pastki menyu tugmasidan ochilganda initData bo'sh bo'ladi, lekin platform ma'lum) */
+function webApp(): TgWebApp | null {
+  if (typeof window === "undefined") return null;
+  const w = (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
+  return w && (w.initData || (w.platform && w.platform !== "unknown")) ? w : null;
+}
+
+/** Bot qo'shgan imzolangan chat parametri (?tgb=&tgc=). Sahifalar orasida yo'qolmasligi uchun sessionStorage'da */
+function telegramLink(): { bot: string; chat: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const bot = q.get("tgb");
+    const chat = q.get("tgc");
+    if (bot && chat) {
+      window.sessionStorage.setItem("tz-tg", JSON.stringify({ bot, chat }));
+      return { bot, chat };
+    }
+    const saved = window.sessionStorage.getItem("tz-tg");
+    return saved ? (JSON.parse(saved) as { bot: string; chat: string }) : null;
+  } catch {
+    return null;
+  }
+}
+
+type Cart = Record<string, number>;
+
+function loadCart(slug: string): Cart {
+  try {
+    const raw = window.localStorage.getItem(`tz-cart:${slug}`);
+    const v = raw ? (JSON.parse(raw) as unknown) : {};
+    return v && typeof v === "object" ? (v as Cart) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCart(slug: string, cart: Cart) {
+  try {
+    window.localStorage.setItem(`tz-cart:${slug}`, JSON.stringify(cart));
+  } catch {
+    // brauzer saqlashga ruxsat bermasa, savat faqat shu sahifada qoladi
+  }
+}
+
+const btnAccent = "rounded-[var(--s-radius)] bg-[color:var(--s-accent)] font-semibold text-white transition hover:brightness-110 disabled:opacity-50";
+const input =
+  "w-full rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-3 py-2.5 text-[color:var(--s-text)] outline-none focus:border-[color:var(--s-accent)]";
+
+function ProductImage({ p, className }: { p: Pick<PublicProduct, "imageUrl" | "emoji" | "name">; className: string }) {
+  if (p.imageUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={p.imageUrl} alt={p.name} loading="lazy" className={`${className} object-cover`} />;
+  }
+  return <div className={`${className} grid place-items-center bg-[color:var(--s-surface)] text-5xl`}>{p.emoji || "📦"}</div>;
+}
+
+function Stepper({ qty, max, onChange }: { qty: number; max: number; onChange: (q: number) => void }) {
+  return (
+    <div className="flex items-center overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)]">
+      <button type="button" aria-label="Kamaytirish" onClick={() => onChange(qty - 1)} className="px-3 py-1.5 text-lg font-bold">
+        −
+      </button>
+      <span className="min-w-8 text-center font-semibold">{qty}</span>
+      <button
+        type="button"
+        aria-label="Ko'paytirish"
+        disabled={qty >= max}
+        onClick={() => onChange(qty + 1)}
+        className="px-3 py-1.5 text-lg font-bold disabled:opacity-30"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopData; heading: string; subheading: string; anchor: string }) {
+  const { products, settings } = shop;
+  const [cart, setCart] = useState<Cart>({});
+  const [category, setCategory] = useState<string>("");
+  const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
+  const [inTelegram, setInTelegram] = useState(false);
+
+  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))], [products]);
+
+  useEffect(() => {
+    telegramLink();
+    const stored = loadCart(shop.slug);
+    const clean: Cart = {};
+    for (const [id, q] of Object.entries(stored)) {
+      const p = byId.get(id);
+      if (p && p.inStock && Number.isInteger(q) && q > 0) clean[id] = Math.min(q, p.maxQty);
+    }
+    setCart(clean);
+  }, [shop.slug, byId]);
+
+  function update(id: string, qty: number) {
+    setCart((c) => {
+      const next = { ...c };
+      if (qty <= 0) delete next[id];
+      else next[id] = Math.min(qty, byId.get(id)?.maxQty ?? 99);
+      saveCart(shop.slug, next);
+      return next;
+    });
+    webApp()?.HapticFeedback?.impactOccurred("light");
+  }
+
+  const lines = Object.entries(cart)
+    .map(([id, qty]) => ({ p: byId.get(id), qty }))
+    .filter((l): l is { p: PublicProduct; qty: number } => !!l.p);
+  const count = lines.reduce((s, l) => s + l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + l.p.price * l.qty, 0);
+  const visible = category ? products.filter((p) => p.category === category) : products;
+
+  function onTelegramLoad() {
+    const w = webApp();
+    if (!w) return;
+    setInTelegram(true);
+    try {
+      w.ready();
+      w.expand();
+    } catch {
+      // eski Telegram versiyasi
+    }
+  }
+
+  return (
+    <section id={anchor} className="bg-[color:var(--s-surface)] py-14 sm:py-20">
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={onTelegramLoad} />
+      <div className="mx-auto w-full max-w-5xl px-5">
+        {heading && <h2 className="text-center text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
+        {subheading && <p className="mx-auto mt-3 max-w-2xl text-center text-[color:var(--s-muted)]">{subheading}</p>}
+
+        {!settings.acceptOrders && (
+          <p className="mx-auto mt-6 max-w-md rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-4 py-3 text-center text-sm">
+            Hozircha onlayn buyurtma qabul qilinmayapti.
+          </p>
+        )}
+
+        {categories.length > 1 && (
+          <div className="mt-8 flex gap-2 overflow-x-auto pb-1">
+            {["", ...categories].map((c) => (
+              <button
+                key={c || "all"}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={`rounded-full border px-4 py-1.5 text-sm whitespace-nowrap ${
+                  category === c
+                    ? "border-[color:var(--s-accent)] bg-[color:var(--s-accent)] font-semibold text-white"
+                    : "border-[color:var(--s-line)] bg-[color:var(--s-bg)]"
+                }`}
+              >
+                {c || "Hammasi"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {products.length === 0 ? (
+          <p className="mt-10 text-center text-[color:var(--s-muted)]">Mahsulotlar tez orada qo&apos;shiladi.</p>
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+            {visible.map((p) => {
+              const qty = cart[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex flex-col overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)]">
+                  <div className="relative">
+                    <ProductImage p={p} className="aspect-square w-full" />
+                    {p.oldPrice && p.oldPrice > p.price && (
+                      <span className="absolute top-2 left-2 rounded-full bg-[color:var(--s-accent)] px-2 py-0.5 text-xs font-bold text-white">
+                        −{Math.round((1 - p.price / p.oldPrice) * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col p-3 sm:p-4">
+                    <h3 className="font-semibold leading-snug">{p.name}</h3>
+                    {p.description && <p className="mt-1 line-clamp-2 text-sm text-[color:var(--s-muted)]">{p.description}</p>}
+                    <div className="mt-auto pt-3">
+                      <p className="font-bold text-[color:var(--s-heading)]">
+                        {formatMoney(p.price)}
+                        {p.oldPrice && p.oldPrice > p.price && (
+                          <span className="ml-2 text-sm font-normal text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>
+                        )}
+                      </p>
+                      <div className="mt-2">
+                        {!p.inStock ? (
+                          <p className="py-2 text-center text-sm text-[color:var(--s-muted)]">Tugagan</p>
+                        ) : !settings.acceptOrders ? null : qty > 0 ? (
+                          <Stepper qty={qty} max={p.maxQty} onChange={(q) => update(p.id, q)} />
+                        ) : (
+                          <button type="button" onClick={() => update(p.id, 1)} className={`${btnAccent} w-full py-2 text-sm`}>
+                            Savatga
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {count > 0 && open === null && (
+        <div className="fixed inset-x-0 bottom-0 z-40 p-3">
+          <button
+            type="button"
+            onClick={() => setOpen("cart")}
+            className={`${btnAccent} mx-auto flex w-full max-w-lg items-center justify-between px-5 py-3.5 shadow-lg`}
+          >
+            <span>🛒 Savat · {count} ta</span>
+            <span>{formatMoney(subtotal)} →</span>
+          </button>
+        </div>
+      )}
+
+      {open && (
+        <CartDrawer
+          shop={shop}
+          lines={lines}
+          subtotal={subtotal}
+          step={open}
+          inTelegram={inTelegram}
+          onStep={setOpen}
+          onQty={update}
+          onClear={() => {
+            setCart({});
+            saveCart(shop.slug, {});
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function CartDrawer({
+  shop,
+  lines,
+  subtotal,
+  step,
+  inTelegram,
+  onStep,
+  onQty,
+  onClear,
+}: {
+  shop: ShopData;
+  lines: { p: PublicProduct; qty: number }[];
+  subtotal: number;
+  step: "cart" | "checkout" | "done";
+  inTelegram: boolean;
+  onStep: (s: null | "cart" | "checkout" | "done") => void;
+  onQty: (id: string, q: number) => void;
+  onClear: () => void;
+}) {
+  const s = shop.settings;
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("+998 ");
+  const [delivery, setDelivery] = useState<"pickup" | "courier">(s.deliveryEnabled && !s.pickupEnabled ? "courier" : "pickup");
+  const [address, setAddress] = useState("");
+  const [comment, setComment] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState<{ number: number; total: number } | null>(null);
+
+  useEffect(() => {
+    const u = webApp()?.initDataUnsafe?.user;
+    if (u && !name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const deliveryPrice =
+    delivery === "courier" ? (s.freeDeliveryFrom !== null && subtotal >= s.freeDeliveryFrom ? 0 : s.deliveryPrice) : 0;
+  const total = subtotal + deliveryPrice;
+  const belowMin = subtotal < s.minOrder;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (shop.preview) {
+      setError("Bu ko'rib chiqish rejimi — buyurtma yuborilmaydi. Nashr qilingan saytda sinab ko'ring.");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch(`/api/shop/${shop.slug}/order`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          items: lines.map((l) => ({ id: l.p.id, qty: l.qty })),
+          name,
+          phone,
+          delivery,
+          address,
+          comment,
+          initData: webApp()?.initData ?? "",
+          tgLink: telegramLink(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; number?: number; total?: number };
+      if (!data.ok) {
+        setError(data.error ?? "Buyurtma yuborilmadi. Qayta urinib ko'ring.");
+        webApp()?.HapticFeedback?.notificationOccurred("error");
+        return;
+      }
+      setDone({ number: data.number ?? 0, total: data.total ?? total });
+      onClear();
+      onStep("done");
+      webApp()?.HapticFeedback?.notificationOccurred("success");
+    } catch {
+      setError("Internet aloqasini tekshirib, qayta urinib ko'ring.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => step !== "done" && onStep(null)}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] p-5 text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
+      >
+        {step === "done" ? (
+          <div className="py-6 text-center">
+            <div className="text-5xl">✅</div>
+            <h3 className="mt-3 text-xl font-bold">Buyurtma №{done?.number} qabul qilindi</h3>
+            <p className="mt-2 text-[color:var(--s-muted)]">
+              Jami: <b className="text-[color:var(--s-text)]">{formatMoney(done?.total ?? 0)}</b>
+            </p>
+            <p className="mt-2 text-sm text-[color:var(--s-muted)]">
+              Tez orada siz bilan bog&apos;lanamiz.{inTelegram ? " Buyurtma holati shu botga keladi." : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const w = webApp();
+                if (w) w.close();
+                else onStep(null);
+              }}
+              className={`${btnAccent} mt-6 w-full py-3`}
+            >
+              {inTelegram ? "Yopish" : "Davom etish"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">{step === "cart" ? "Savat" : "Buyurtmani rasmiylashtirish"}</h3>
+              <button type="button" onClick={() => onStep(null)} aria-label="Yopish" className="text-2xl leading-none text-[color:var(--s-muted)]">
+                ×
+              </button>
+            </div>
+
+            {step === "cart" && (
+              <>
+                {lines.length === 0 ? (
+                  <p className="py-8 text-center text-[color:var(--s-muted)]">Savat bo&apos;sh</p>
+                ) : (
+                  <ul className="mt-4 divide-y divide-[color:var(--s-line)]">
+                    {lines.map(({ p, qty }) => (
+                      <li key={p.id} className="flex items-center gap-3 py-3">
+                        <ProductImage p={p} className="size-14 shrink-0 rounded-[calc(var(--s-radius)*0.6)] text-2xl" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{p.name}</p>
+                          <p className="text-sm text-[color:var(--s-muted)]">{formatMoney(p.price * qty)}</p>
+                        </div>
+                        <Stepper qty={qty} max={p.maxQty} onChange={(q) => onQty(p.id, q)} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-4 flex items-center justify-between border-t border-[color:var(--s-line)] pt-4 font-bold">
+                  <span>Jami</span>
+                  <span>{formatMoney(subtotal)}</span>
+                </div>
+                {belowMin && <p className="mt-2 text-sm text-[color:var(--s-muted)]">Minimal buyurtma: {formatMoney(s.minOrder)}</p>}
+                <button
+                  type="button"
+                  disabled={!lines.length || belowMin}
+                  onClick={() => onStep("checkout")}
+                  className={`${btnAccent} mt-4 w-full py-3`}
+                >
+                  Rasmiylashtirish →
+                </button>
+              </>
+            )}
+
+            {step === "checkout" && (
+              <form onSubmit={submit} className="mt-4 space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Ismingiz</span>
+                  <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} className={input} autoComplete="name" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Telefon</span>
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} required inputMode="tel" maxLength={30} className={input} autoComplete="tel" />
+                </label>
+
+                <div>
+                  <span className="mb-1 block text-sm font-medium">Qabul qilish usuli</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {s.pickupEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setDelivery("pickup")}
+                        className={`rounded-[calc(var(--s-radius)*0.6)] border px-3 py-2.5 text-left text-sm ${delivery === "pickup" ? "border-[color:var(--s-accent)] font-semibold" : "border-[color:var(--s-line)]"}`}
+                      >
+                        🏪 Olib ketish
+                        <span className="block text-xs font-normal text-[color:var(--s-muted)]">Bepul</span>
+                      </button>
+                    )}
+                    {s.deliveryEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setDelivery("courier")}
+                        className={`rounded-[calc(var(--s-radius)*0.6)] border px-3 py-2.5 text-left text-sm ${delivery === "courier" ? "border-[color:var(--s-accent)] font-semibold" : "border-[color:var(--s-line)]"}`}
+                      >
+                        🚚 Yetkazib berish
+                        <span className="block text-xs font-normal text-[color:var(--s-muted)]">
+                          {s.deliveryPrice === 0 ? "Bepul" : formatMoney(s.deliveryPrice)}
+                          {s.freeDeliveryFrom !== null && s.deliveryPrice > 0 ? ` · ${formatMoney(s.freeDeliveryFrom)} dan bepul` : ""}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                  {delivery === "pickup" && s.pickupAddress && <p className="mt-2 text-sm text-[color:var(--s-muted)]">📍 {s.pickupAddress}</p>}
+                </div>
+
+                {delivery === "courier" && (
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium">Manzil</span>
+                    <textarea value={address} onChange={(e) => setAddress(e.target.value)} required minLength={5} maxLength={300} rows={2} className={input} placeholder="Shahar, ko'cha, uy, mo'ljal" />
+                  </label>
+                )}
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Izoh (ixtiyoriy)</span>
+                  <input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} className={input} />
+                </label>
+
+                <div className="space-y-1 rounded-[calc(var(--s-radius)*0.6)] bg-[color:var(--s-surface)] p-3 text-sm">
+                  <div className="flex justify-between">
+                    <span>Mahsulotlar</span>
+                    <span>{formatMoney(subtotal)}</span>
+                  </div>
+                  {delivery === "courier" && (
+                    <div className="flex justify-between">
+                      <span>Yetkazish</span>
+                      <span>{deliveryPrice === 0 ? "Bepul" : formatMoney(deliveryPrice)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1 text-base font-bold">
+                    <span>Jami</span>
+                    <span>{formatMoney(total)}</span>
+                  </div>
+                  <p className="pt-1 text-xs text-[color:var(--s-muted)]">To&apos;lov: qabul qilganda naqd yoki karta orqali</p>
+                </div>
+
+                {error && <p className="rounded-[calc(var(--s-radius)*0.6)] bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => onStep("cart")} className="rounded-[var(--s-radius)] border border-[color:var(--s-line)] px-4 py-3">
+                    ←
+                  </button>
+                  <button type="submit" disabled={sending} className={`${btnAccent} flex-1 py-3`}>
+                    {sending ? "Yuborilmoqda…" : `Buyurtma berish · ${formatMoney(total)}`}
+                  </button>
+                </div>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Tahrirlovchida ko'rinadigan namuna (haqiqiy mahsulotlar nashr qilingan saytda chiqadi) */
+export function ShopPlaceholder({ heading, subheading, anchor }: { heading: string; subheading: string; anchor: string }) {
+  const sample = [
+    { emoji: "👕", name: "Mahsulot 1", price: 120000 },
+    { emoji: "👟", name: "Mahsulot 2", price: 350000 },
+    { emoji: "🎒", name: "Mahsulot 3", price: 210000 },
+  ];
+  return (
+    <section id={anchor} className="bg-[color:var(--s-surface)] py-14 sm:py-20">
+      <div className="mx-auto w-full max-w-5xl px-5">
+        {heading && <h2 className="text-center text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
+        {subheading && <p className="mx-auto mt-3 max-w-2xl text-center text-[color:var(--s-muted)]">{subheading}</p>}
+        <p className="mx-auto mt-4 max-w-md rounded-[var(--s-radius)] border border-dashed border-[color:var(--s-line)] px-4 py-2 text-center text-sm text-[color:var(--s-muted)]">
+          Bu yerda &quot;Mahsulotlar&quot; bo&apos;limidagi mahsulotlaringiz savat bilan chiqadi
+        </p>
+        <div className="mt-6 grid grid-cols-2 gap-3 opacity-70 sm:gap-4 lg:grid-cols-3">
+          {sample.map((p) => (
+            <div key={p.name} className="overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)]">
+              <div className="grid aspect-square place-items-center bg-[color:var(--s-surface)] text-5xl">{p.emoji}</div>
+              <div className="p-3">
+                <p className="font-semibold">{p.name}</p>
+                <p className="mt-2 font-bold text-[color:var(--s-heading)]">{formatMoney(p.price)}</p>
+                <div className={`${btnAccent} mt-2 py-2 text-center text-sm`}>Savatga</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

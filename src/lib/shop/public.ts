@@ -1,0 +1,56 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { ShopData } from "./types";
+
+/**
+ * Ommaviy sayt uchun do'kon ma'lumotlari: faqat faol mahsulotlar va mijozga kerakli sozlamalar.
+ * Service role bilan o'qiladi, lekin faqat xavfsiz ustunlar tashqariga chiqadi.
+ */
+export async function loadShopData(workspaceId: string, slug: string, opts: { preview?: boolean } = {}): Promise<ShopData | null> {
+  let db;
+  try {
+    db = createAdminClient();
+  } catch {
+    return null;
+  }
+  const [{ data: products }, { data: s }] = await Promise.all([
+    db
+      .from("products")
+      .select("id, name, description, price, old_price, category, image_url, emoji, stock")
+      .eq("workspace_id", workspaceId)
+      .eq("is_active", true)
+      .order("sort", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(500),
+    db
+      .from("shop_settings")
+      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+  ]);
+
+  return {
+    slug,
+    preview: !!opts.preview,
+    products: (products ?? []).map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+      description: (p.description as string) ?? "",
+      price: Number(p.price),
+      oldPrice: p.old_price === null ? null : Number(p.old_price),
+      category: (p.category as string) ?? "",
+      imageUrl: (p.image_url as string | null) ?? null,
+      emoji: (p.emoji as string) ?? "",
+      inStock: p.stock === null || Number(p.stock) > 0,
+      maxQty: p.stock === null ? 99 : Math.min(99, Number(p.stock)),
+    })),
+    settings: {
+      acceptOrders: s?.accept_orders ?? true,
+      pickupEnabled: s?.pickup_enabled ?? true,
+      pickupAddress: (s?.pickup_address as string) ?? "",
+      deliveryEnabled: s?.delivery_enabled ?? true,
+      deliveryPrice: Number(s?.delivery_price ?? 0),
+      freeDeliveryFrom: s?.free_delivery_from == null ? null : Number(s.free_delivery_from),
+      minOrder: Number(s?.min_order ?? 0),
+    },
+  };
+}

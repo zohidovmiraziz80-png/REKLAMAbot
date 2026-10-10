@@ -10,6 +10,18 @@ import {
   removeCustomDomain,
   unpublishWebsite,
 } from "./publishing";
+import {
+  deleteProduct,
+  getShopSettings,
+  listCustomers,
+  listOrders,
+  listProducts,
+  saveProduct,
+  saveShopSettings,
+  setProductActive,
+  updateCustomer,
+  updateOrder,
+} from "./shop";
 import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
 
 /**
@@ -39,6 +51,16 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   disconnectBot,
   updateBotRequestStatus,
   getMyPlan,
+  listProducts,
+  saveProduct,
+  setProductActive,
+  deleteProduct,
+  listOrders,
+  updateOrder,
+  listCustomers,
+  updateCustomer,
+  getShopSettings,
+  saveShopSettings,
 ];
 
 export function getAction(name: string) {

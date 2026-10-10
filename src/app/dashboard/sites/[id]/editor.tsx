@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { SiteRenderer } from "@/components/site/renderer";
 import {
@@ -236,6 +237,20 @@ function BlockForm({ block, onChange }: { block: Block; onChange: (b: Block) => 
             <TextField label="Tugma matni" value={block.buttonText} onChange={(v) => set("buttonText", v)} />
             <TextField label="Tugma havolasi" value={block.buttonLink} onChange={(v) => set("buttonLink", v)} placeholder="#aloqa" />
           </div>
+        </div>
+      );
+    case "shop":
+      return (
+        <div className="space-y-3">
+          <TextField label="Sarlavha" value={block.heading} onChange={(v) => set("heading", v)} />
+          <TextField label="Qisqa tavsif" value={block.subheading} onChange={(v) => set("subheading", v)} />
+          <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
+            Mahsulotlar, narxlar va qoldiq{" "}
+            <Link href="/dashboard/products" target="_blank" className="font-semibold underline">
+              Mahsulotlar
+            </Link>{" "}
+            bo&apos;limidan avtomatik olinadi. Mijoz savatga qo&apos;shib buyurtma beradi.
+          </p>
         </div>
       );
     case "contact":

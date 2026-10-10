@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { SiteRenderer } from "@/components/site/renderer";
+import { loadShopData } from "@/lib/shop/public";
 import { siteSchema } from "@/lib/site/schema";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
@@ -19,10 +20,10 @@ const loadSite = cache(async (slug: string) => {
   const { url, anonKey } = getSupabaseEnv();
   // Sessiyasiz klient — ommaviy sahifa cookie'larga bog'liq emas
   const supabase = createClient(url, anonKey, { auth: { persistSession: false } });
-  const { data } = await supabase.from("published_sites").select("content").eq("slug", slug).maybeSingle();
+  const { data } = await supabase.from("published_sites").select("content, workspace_id").eq("slug", slug).maybeSingle();
   if (!data) return null;
   const parsed = siteSchema.safeParse(data.content);
-  return parsed.success ? parsed.data : null;
+  return parsed.success ? { site: parsed.data, workspaceId: data.workspace_id as string } : null;
 });
 
 async function basePath(slug: string) {
@@ -34,7 +35,7 @@ async function basePath(slug: string) {
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
-  const site = await loadSite(slug);
+  const site = (await loadSite(slug))?.site;
   if (!site) return { title: "Sayt topilmadi" };
   return {
     title: { absolute: site.name },
@@ -45,12 +46,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function PublicSitePage({ params }: { params: Params }) {
   const { slug, page } = await params;
-  const site = await loadSite(slug);
-  if (!site) notFound();
+  const loaded = await loadSite(slug);
+  if (!loaded) notFound();
+  const { site } = loaded;
 
   const pageSlug = page?.[0] ?? "home";
   const current = site.pages.find((p) => p.slug === pageSlug);
   if (!current) notFound();
 
-  return <SiteRenderer site={site} page={current} basePath={await basePath(slug)} />;
+  const shop = await loadShopData(loaded.workspaceId, slug);
+  return <SiteRenderer site={site} page={current} basePath={await basePath(slug)} shop={shop ?? undefined} />;
 }

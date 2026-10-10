@@ -64,6 +64,14 @@ export const productsBlock = z.object({
     .catch([]),
 });
 
+/** Jonli katalog: mahsulotlar "Mahsulotlar" bo'limidan olinadi, savat va buyurtma bilan */
+export const shopBlock = z.object({
+  type: z.literal("shop"),
+  id,
+  heading: txt(120),
+  subheading: txt(240),
+});
+
 export const aboutBlock = z.object({
   type: z.literal("about"),
   id,
@@ -116,6 +124,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   heroBlock,
   featuresBlock,
   productsBlock,
+  shopBlock,
   aboutBlock,
   testimonialsBlock,
   faqBlock,
@@ -128,6 +137,7 @@ export type BlockType = Block["type"];
 export const BLOCK_TYPES: BlockType[] = [
   "hero",
   "features",
+  "shop",
   "products",
   "about",
   "testimonials",
@@ -236,6 +246,8 @@ export function defaultBlock(type: BlockType): Block {
         subheading: "",
         items: [{ emoji: "📦", name: "Mahsulot nomi", price: "", description: "Qisqa tavsif", badge: "" }],
       };
+    case "shop":
+      return { ...base, type, heading: "Katalog", subheading: "Savatga qo'shing va onlayn buyurtma bering" };
     case "about":
       return { ...base, type, heading: "Biz haqimizda", text: "Biznesingiz haqida bir necha jumla." };
     case "testimonials":
@@ -257,7 +269,8 @@ export function defaultBlock(type: BlockType): Block {
 export const BLOCK_LABELS: Record<BlockType, string> = {
   hero: "Bosh banner",
   features: "Afzalliklar",
-  products: "Mahsulotlar / xizmatlar",
+  shop: "Do'kon (katalog + savat)",
+  products: "Mahsulotlar / xizmatlar (qo'lda)",
   about: "Biz haqimizda",
   testimonials: "Mijozlar fikri",
   faq: "Savol-javob",
