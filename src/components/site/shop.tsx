@@ -174,12 +174,17 @@ export function ShopSection({
   subheading,
   anchor,
   layout: layoutProp,
+  headingNode,
+  subheadingNode,
 }: {
   shop: ShopData;
   heading: string;
   subheading: string;
   anchor: string;
   layout?: ShopLayout;
+  /** Tahrirlovchida joyida tahrirlanadigan sarlavha */
+  headingNode?: React.ReactNode;
+  subheadingNode?: React.ReactNode;
 }) {
   const layout = layoutProp ?? DEFAULT_LAYOUT;
   const settings = shop.settings;
@@ -292,8 +297,8 @@ export function ShopSection({
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-5">
         {(heading || subheading) && (
           <div className={left ? "" : "text-center"}>
-            {heading && <h2 className="text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
-            {subheading && <p className={`mt-2 max-w-2xl text-[color:var(--s-muted)] ${left ? "" : "mx-auto"}`}>{subheading}</p>}
+            {heading && <h2 className="text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{headingNode ?? heading}</h2>}
+            {subheading && <p className={`mt-2 max-w-2xl text-[color:var(--s-muted)] ${left ? "" : "mx-auto"}`}>{subheadingNode ?? subheading}</p>}
           </div>
         )}
 

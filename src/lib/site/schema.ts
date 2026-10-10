@@ -46,6 +46,8 @@ export const blockStyleSchema = z.object({
 export type BlockStyle = z.output<typeof blockStyleSchema>;
 export const DEFAULT_BLOCK_STYLE: BlockStyle = { bg: "default", bgColor: "#f5f7fb", bgImage: "", pad: "md", align: "center" };
 const style = opt(blockStyleSchema);
+/** Blokning tayyor dizayn varianti (har blok turi uchun o'z ro'yxati, noma'lum bo'lsa — standart) */
+const variant = opt(z.string().max(24));
 
 // ===== Bloklar =====
 
@@ -53,6 +55,7 @@ export const heroBlock = z.object({
   type: z.literal("hero"),
   id,
   style,
+  variant,
   /** Fon yoki yon rasm */
   image: opt(imageUrl),
   imageMode: opt(z.enum(["background", "side"])),
@@ -67,6 +70,7 @@ export const featuresBlock = z.object({
   type: z.literal("features"),
   id,
   style,
+  variant,
   heading: txt(120),
   items: z
     .array(z.object({ icon: txt(8), title: txt(80), text: txt(240) }))
@@ -78,6 +82,7 @@ export const productsBlock = z.object({
   type: z.literal("products"),
   id,
   style,
+  variant,
   heading: txt(120),
   subheading: txt(240),
   items: z
@@ -99,6 +104,7 @@ export const shopBlock = z.object({
   type: z.literal("shop"),
   id,
   style,
+  variant,
   heading: txt(120),
   subheading: txt(240),
   /** Faqat shu kategoriya (bo'sh = hammasi) — har xil joyda alohida kataloglar qo'yish uchun */
@@ -116,6 +122,7 @@ export const imageBlock = z.object({
   type: z.literal("image"),
   id,
   style,
+  variant,
   src: imageUrl,
   alt: txt(120),
   caption: txt(200),
@@ -127,6 +134,7 @@ export const galleryBlock = z.object({
   type: z.literal("gallery"),
   id,
   style,
+  variant,
   heading: txt(120),
   images: z
     .array(z.object({ src: imageUrl, caption: txt(120) }))
@@ -139,6 +147,7 @@ export const textBlock = z.object({
   type: z.literal("text"),
   id,
   style,
+  variant,
   heading: txt(120),
   text: txt(4000),
 });
@@ -147,6 +156,7 @@ export const aboutBlock = z.object({
   type: z.literal("about"),
   id,
   style,
+  variant,
   image: opt(imageUrl),
   heading: txt(120),
   text: txt(1500),
@@ -156,6 +166,7 @@ export const testimonialsBlock = z.object({
   type: z.literal("testimonials"),
   id,
   style,
+  variant,
   heading: txt(120),
   items: z
     .array(z.object({ name: txt(60), role: txt(60), text: txt(400) }))
@@ -167,6 +178,7 @@ export const faqBlock = z.object({
   type: z.literal("faq"),
   id,
   style,
+  variant,
   heading: txt(120),
   items: z
     .array(z.object({ q: txt(200), a: txt(800) }))
@@ -178,6 +190,7 @@ export const ctaBlock = z.object({
   type: z.literal("cta"),
   id,
   style,
+  variant,
   heading: txt(120),
   text: txt(300),
   buttonText: txt(40),
@@ -188,6 +201,7 @@ export const contactBlock = z.object({
   type: z.literal("contact"),
   id,
   style,
+  variant,
   heading: txt(120),
   text: txt(300),
   phone: txt(30),
@@ -286,6 +300,13 @@ export const siteSchema = z
         showNav: z.boolean().catch(true),
         ctaText: txt(30),
         ctaLink: txt(300),
+        variant: opt(z.enum(["classic", "centered", "dark"])),
+      }),
+    ),
+    footer: opt(
+      z.object({
+        variant: z.enum(["simple", "columns", "dark"]).catch("simple"),
+        text: txt(300),
       }),
     ),
     pages: z.array(pageSchema).min(1).transform((p) => p.slice(0, 6)),
@@ -377,4 +398,42 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   faq: "Savol-javob",
   cta: "Chaqiriq (tugma)",
   contact: "Aloqa",
+};
+
+/** Har blok turi uchun tayyor dizaynlar (bloklar kutubxonasi) */
+export const BLOCK_VARIANTS: Partial<Record<BlockType, { id: string; label: string }[]>> = {
+  hero: [
+    { id: "classic", label: "Rangli fon" },
+    { id: "split", label: "Matn + rasm" },
+    { id: "image", label: "Katta rasm" },
+    { id: "minimal", label: "Minimal" },
+  ],
+  features: [
+    { id: "cards", label: "Kartochkalar" },
+    { id: "icons", label: "Ikonkalar" },
+    { id: "list", label: "Ro'yxat" },
+  ],
+  about: [
+    { id: "simple", label: "Oddiy" },
+    { id: "split", label: "Rasm yonida" },
+    { id: "card", label: "Kartochka" },
+  ],
+  testimonials: [
+    { id: "cards", label: "Kartochkalar" },
+    { id: "quote", label: "Katta iqtibos" },
+  ],
+  faq: [
+    { id: "accordion", label: "Ochiladigan" },
+    { id: "columns", label: "Ikki ustun" },
+  ],
+  cta: [
+    { id: "banner", label: "Banner" },
+    { id: "bar", label: "Qator" },
+    { id: "minimal", label: "Minimal" },
+  ],
+  contact: [
+    { id: "cards", label: "Kartochkalar" },
+    { id: "split", label: "Ikki qism" },
+    { id: "minimal", label: "Minimal" },
+  ],
 };

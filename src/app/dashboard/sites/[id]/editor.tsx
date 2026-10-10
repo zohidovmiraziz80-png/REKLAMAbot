@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { SiteRenderer } from "@/components/site/renderer";
+import { FramePreview } from "@/components/site/frame-preview";
+import { BlockPreview, SiteRenderer } from "@/components/site/renderer";
 import {
   BLOCK_LABELS,
   BLOCK_TYPES,
+  BLOCK_VARIANTS,
   DEFAULT_BLOCK_STYLE,
   defaultBlock,
   randomId,
@@ -232,8 +234,29 @@ const BG_OPTIONS: [BlockStyle["bg"], string][] = [
 function StyleEditor({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
   const st: BlockStyle = { ...DEFAULT_BLOCK_STYLE, ...(block.style ?? {}) };
   const set = (patch: Partial<BlockStyle>) => onChange({ ...block, style: { ...st, ...patch } } as Block);
+  const variants = BLOCK_VARIANTS[block.type];
   return (
     <div className="space-y-3">
+      {variants && (
+        <div>
+          <span className="mb-1 block text-xs font-medium text-muted">Ko&apos;rinish (tayyor dizayn)</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {variants.map((v, i) => {
+              const active = (block.variant ?? variants[0].id) === v.id || (!block.variant && i === 0);
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onChange({ ...block, variant: v.id } as Block)}
+                  className={`rounded-md border px-2 py-1.5 text-xs font-medium ${active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-line hover:border-brand-500"}`}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <SelectField label="Fon" value={st.bg} options={BG_OPTIONS} onChange={(v) => set({ bg: v })} />
       {st.bg === "custom" && (
         <label className="flex items-center gap-2 text-sm">
@@ -525,6 +548,103 @@ function BlockContentForm({ block, onChange, categories }: { block: Block; onCha
   }
 }
 
+
+// ===== Bloklar kutubxonasi =====
+
+const LIBRARY: { label: string; types: BlockType[] }[] = [
+  { label: "Bosh banner", types: ["hero"] },
+  { label: "Do'kon / katalog", types: ["shop"] },
+  { label: "Afzalliklar", types: ["features"] },
+  { label: "Biz haqimizda", types: ["about"] },
+  { label: "Rasm va galereya", types: ["image", "gallery"] },
+  { label: "Matn", types: ["text"] },
+  { label: "Mijozlar fikri", types: ["testimonials"] },
+  { label: "Savol-javob", types: ["faq"] },
+  { label: "Chaqiriq (tugma)", types: ["cta"] },
+  { label: "Aloqa", types: ["contact"] },
+  { label: "Mahsulotlar (qo'lda)", types: ["products"] },
+];
+
+function sampleBlock(type: BlockType, variant: string): Block {
+  const b = defaultBlock(type) as Block;
+  return { ...b, variant: variant || undefined } as Block;
+}
+
+function LibraryModal({
+  site,
+  shop,
+  onPick,
+  onClose,
+}: {
+  site: Site;
+  shop?: ShopData | null;
+  onPick: (type: BlockType, variant: string) => void;
+  onClose: () => void;
+}) {
+  const [group, setGroup] = useState(0);
+  const items = LIBRARY[group].types.flatMap((t) => (BLOCK_VARIANTS[t] ?? [{ id: "", label: BLOCK_LABELS[t] }]).map((v) => ({ type: t, variant: v.id, label: v.label })));
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="flex h-[88dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between bg-brand-700 px-5 py-3 text-white">
+          <h2 className="font-semibold">Blok qo&apos;shish</h2>
+          <button type="button" onClick={onClose} className="text-2xl leading-none" aria-label="Yopish">
+            ×
+          </button>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+          <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-2 sm:w-56 sm:flex-col sm:overflow-y-auto sm:border-r sm:border-b-0">
+            {LIBRARY.map((g, i) => (
+              <button
+                key={g.label}
+                type="button"
+                onClick={() => setGroup(i)}
+                className={`rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap ${i === group ? "bg-brand-600 font-semibold text-white" : "hover:bg-surface"}`}
+              >
+                {BLOCK_ICONS[g.types[0]]} {g.label}
+              </button>
+            ))}
+          </nav>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-surface p-4">
+            {items.map((it) => (
+              <button
+                key={`${it.type}-${it.variant}`}
+                type="button"
+                onClick={() => onPick(it.type, it.variant)}
+                className="group block w-full overflow-hidden rounded-xl border-2 border-transparent bg-white text-left shadow-sm transition hover:border-brand-500"
+              >
+                <div className="relative h-52 overflow-hidden">
+                  <div className="pointer-events-none absolute top-0 left-0 w-[1200px] origin-top-left scale-[0.55] sm:scale-[0.6]">
+                    <BlockPreview site={site} block={sampleBlock(it.type, it.variant)} shop={shop ? { ...shop, embedded: true } : undefined} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-line px-4 py-2 text-sm">
+                  <span className="font-medium">{it.label}</span>
+                  <span className="font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">+ Qo&apos;shish</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** "items.0.title" kabi yo'l bo'yicha qiymatni o'zgartiradi (nusxa qaytaradi) */
+function setPath<T>(obj: T, parts: string[], value: unknown): T {
+  if (!parts.length) return value as T;
+  const [head, ...rest] = parts;
+  if (Array.isArray(obj)) {
+    const i = Number(head);
+    const copy = obj.slice();
+    copy[i] = setPath(copy[i], rest, value);
+    return copy as T;
+  }
+  const o = (obj ?? {}) as Record<string, unknown>;
+  return { ...o, [head]: setPath(o[head], rest, value) } as T;
+}
+
 // ===== Asosiy tahrirlovchi =====
 
 export function SiteEditor({
@@ -558,8 +678,15 @@ export function SiteEditor({
   const categories = useMemo(() => [...new Set((shop?.products ?? []).map((p) => p.category).filter(Boolean))].sort(), [shop]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
-  const [picker, setPicker] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [library, setLibrary] = useState<null | { afterId: string | null }>(null);
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [fullscreen, setFullscreen] = useState(true);
+  const frameBody = useRef<HTMLElement | null>(null);
+  // Orqaga / oldinga (undo / redo)
+  const past = useRef<Site[]>([]);
+  const future = useRef<Site[]>([]);
+  const lastPush = useRef(0);
+  const [, setHistoryTick] = useState(0);
 
   // Mahsulotlar qo'shilgan, lekin saytda hali eski qo'lda yozilgan "Mahsulotlar" bloki turgan bo'lsa —
   // uni jonli katalogga aylantiramiz (sarlavhasi saqlanadi)
@@ -591,7 +718,7 @@ export function SiteEditor({
       setMobileView("edit");
       setTimeout(() => document.getElementById(`blk-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
     } else {
-      previewRef.current?.querySelector(`[data-block-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      frameBody.current?.querySelector(`[data-block-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
@@ -620,20 +747,6 @@ export function SiteEditor({
     updateBlocks((list) => list.filter((x) => x.id !== id));
   }
 
-  function addBlock(type: BlockType) {
-    const nb = defaultBlock(type);
-    updateBlocks((b) => {
-      const i = openBlock ? b.findIndex((x) => x.id === openBlock) : -1;
-      if (i < 0) return [...b, nb];
-      const copy = b.slice();
-      copy.splice(i + 1, 0, nb);
-      return copy;
-    });
-    setOpenBlock(nb.id);
-    setPicker(false);
-    setTimeout(() => previewRef.current?.querySelector(`[data-block-id="${nb.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-  }
-
   function dropAt(target: number) {
     if (dragIdx === null || dragIdx === target) return;
     updateBlocks((b) => {
@@ -653,9 +766,79 @@ export function SiteEditor({
   }, [dirty]);
 
   function update(mutator: (draft: Site) => Site) {
-    setSite((s) => mutator(s));
+    setSite((s) => {
+      const now = Date.now();
+      // Ketma-ket tez o'zgarishlar (matn yozish) bitta qadam hisoblanadi
+      if (now - lastPush.current > 800 && past.current[past.current.length - 1] !== s) {
+        past.current.push(s);
+        if (past.current.length > 80) past.current.shift();
+      }
+      lastPush.current = now;
+      future.current = [];
+      return mutator(s);
+    });
+    setHistoryTick((t) => t + 1);
     setDirty(true);
     setStatus(null);
+  }
+
+  function undo() {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(site);
+    lastPush.current = 0;
+    setSite(prev);
+    setDirty(true);
+    setHistoryTick((t) => t + 1);
+  }
+
+  function redo() {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(site);
+    lastPush.current = 0;
+    setSite(next);
+    setDirty(true);
+    setHistoryTick((t) => t + 1);
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  function setHeader(patch: Partial<NonNullable<Site["header"]>>) {
+    update((s) => ({ ...s, header: { logo: "", showNav: true, ctaText: "", ctaLink: "", ...(s.header ?? {}), ...patch } }));
+  }
+
+  function setField(blockId: string, path: string, value: string) {
+    updateBlocks((b) => b.map((x) => (x.id === blockId ? setPath(x, path.split("."), value) : x)));
+  }
+
+  function addBlockAt(type: BlockType, variant: string, afterId: string | null) {
+    const nb = { ...defaultBlock(type), variant: variant || undefined } as Block;
+    updateBlocks((b) => {
+      const i = afterId ? b.findIndex((x) => x.id === afterId) : -1;
+      if (i < 0) return [...b, nb];
+      const copy = b.slice();
+      copy.splice(i + 1, 0, nb);
+      return copy;
+    });
+    setOpenBlock(nb.id);
+    setLibrary(null);
+    setTimeout(() => frameBody.current?.querySelector(`[data-block-id="${nb.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }
 
   function updateBlocks(fn: (blocks: Block[]) => Block[]) {
@@ -728,34 +911,76 @@ export function SiteEditor({
   const labels = useMemo(() => Object.fromEntries(page.blocks.map((b) => [b.id, `${BLOCK_ICONS[b.type]} ${BLOCK_LABELS[b.type]}`])), [page]);
 
   const preview = (
-    <div
-      ref={previewRef}
-      className="h-full overflow-y-auto rounded-xl border border-line bg-white shadow-sm"
-      onClickCapture={(e) => {
-        // Tahrirlovchi ichida havolalar boshqa sahifaga olib ketmasin
-        if ((e.target as HTMLElement).closest("a")) e.preventDefault();
-      }}
-    >
-      <SiteRenderer
-        site={site}
-        page={page}
-        shop={shop ?? undefined}
-        editing={{
-          selectedId: openBlock,
-          labels,
-          onSelect: (id) => selectBlock(id, "preview"),
-          onMove: moveBlock,
-          onDuplicate: duplicateBlock,
-          onDelete: deleteBlock,
+    <div className="h-full overflow-hidden rounded-xl border border-line bg-[#e9edf5] shadow-sm">
+      <FramePreview
+        width={device === "desktop" ? "100%" : device === "tablet" ? 820 : 390}
+        onBody={(b) => {
+          frameBody.current = b;
         }}
-      />
+      >
+        <div
+          onClickCapture={(e) => {
+            // Tahrirlovchi ichida havolalar boshqa sahifaga olib ketmasin
+            if ((e.target as HTMLElement).closest("a")) e.preventDefault();
+          }}
+        >
+          <SiteRenderer
+            site={site}
+            page={page}
+            shop={shop ?? undefined}
+            editing={{
+              selectedId: openBlock,
+              labels,
+              onSelect: (id) => selectBlock(id, "preview"),
+              onMove: moveBlock,
+              onDuplicate: duplicateBlock,
+              onDelete: deleteBlock,
+              onField: setField,
+              onAddAfter: (id) => setLibrary({ afterId: id }),
+            }}
+          />
+        </div>
+      </FramePreview>
     </div>
   );
 
+  const tb = "grid size-9 place-items-center rounded-lg text-base hover:bg-surface disabled:opacity-30";
   return (
-    <div className="space-y-4">
+    <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col gap-2 bg-[#eef1f7] p-2 sm:p-3" : "space-y-4"}>
       {/* Yuqori panel */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white p-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white p-2 sm:p-3">
+        {fullscreen && (
+          <Link href="/dashboard/sites" className="rounded-lg px-2 py-1.5 text-sm font-medium text-muted hover:bg-surface hover:text-ink" title="Saytlar ro'yxatiga">
+            ← Chiqish
+          </Link>
+        )}
+        <div className="flex items-center border-x border-line px-1">
+          <button type="button" className={tb} disabled={!past.current.length} onClick={undo} title="Orqaga (Ctrl+Z)" aria-label="Orqaga">
+            ↶
+          </button>
+          <button type="button" className={tb} disabled={!future.current.length} onClick={redo} title="Oldinga (Ctrl+Y)" aria-label="Oldinga">
+            ↷
+          </button>
+        </div>
+        <div className="hidden items-center rounded-lg bg-surface p-0.5 lg:flex">
+          {(
+            [
+              ["desktop", "🖥", "Kompyuter"],
+              ["tablet", "📟", "Planshet"],
+              ["mobile", "📱", "Telefon"],
+            ] as const
+          ).map(([d, icon, label]) => (
+            <button
+              key={d}
+              type="button"
+              title={label}
+              onClick={() => setDevice(d)}
+              className={`rounded-md px-2.5 py-1 text-sm ${device === d ? "bg-white shadow-sm" : "opacity-60 hover:opacity-100"}`}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {site.pages.map((p, i) => (
             <button
@@ -806,6 +1031,9 @@ export function SiteEditor({
           {saving ? "Saqlanmoqda..." : "Saqlash"}
         </button>
         <PublishPanel projectId={projectId} initialStatus={publishStatus} dirty={dirty} saveFirst={saveNow} />
+        <button type="button" className={tb} onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Oddiy ko'rinish" : "To'liq ekran"}>
+          {fullscreen ? "⤡" : "⤢"}
+        </button>
       </div>
 
       {/* AI bilan tahrirlash (faqat AI yoqilganda) */}
@@ -857,9 +1085,9 @@ export function SiteEditor({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[400px_1fr]">
+      <div className={`grid gap-3 lg:grid-cols-[380px_1fr] ${fullscreen ? "min-h-0 flex-1" : ""}`}>
         {/* Chap panel: sozlamalar va bloklar */}
-        <div className={`space-y-4 ${mobileView === "preview" ? "hidden lg:block" : ""}`}>
+        <div className={`space-y-3 ${fullscreen ? "min-h-0 overflow-y-auto pr-1 pb-6" : ""} ${mobileView === "preview" ? "hidden lg:block" : ""}`}>
           <details className="rounded-xl border border-line bg-white p-4" open={false}>
             <summary className="cursor-pointer text-sm font-semibold">🎨 Sayt sozlamalari va ranglar</summary>
             <div className="mt-4 space-y-3">
@@ -870,27 +1098,56 @@ export function SiteEditor({
                 <ImageField
                   label="Logotip"
                   value={site.header?.logo ?? ""}
-                  onChange={(v) => update((s) => ({ ...s, header: { logo: v, showNav: s.header?.showNav ?? true, ctaText: s.header?.ctaText ?? "", ctaLink: s.header?.ctaLink ?? "" } }))}
+                  onChange={(v) => setHeader({ logo: v })}
                 />
                 <CheckField
                   label="Sahifalar menyusini ko'rsatish"
                   checked={site.header?.showNav ?? true}
-                  onChange={(v) => update((s) => ({ ...s, header: { logo: s.header?.logo ?? "", showNav: v, ctaText: s.header?.ctaText ?? "", ctaLink: s.header?.ctaLink ?? "" } }))}
+                  onChange={(v) => setHeader({ showNav: v })}
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <TextField
                     label="Tugma matni"
                     value={site.header?.ctaText ?? ""}
                     placeholder="Bog'lanish"
-                    onChange={(v) => update((s) => ({ ...s, header: { logo: s.header?.logo ?? "", showNav: s.header?.showNav ?? true, ctaText: v, ctaLink: s.header?.ctaLink ?? "" } }))}
+                    onChange={(v) => setHeader({ ctaText: v })}
                   />
                   <TextField
                     label="Tugma havolasi"
                     value={site.header?.ctaLink ?? ""}
                     placeholder="#katalog"
-                    onChange={(v) => update((s) => ({ ...s, header: { logo: s.header?.logo ?? "", showNav: s.header?.showNav ?? true, ctaText: s.header?.ctaText ?? "", ctaLink: v } }))}
+                    onChange={(v) => setHeader({ ctaLink: v })}
                   />
                 </div>
+                <Segmented
+                  label="Menyu dizayni"
+                  value={site.header?.variant ?? "classic"}
+                  options={[
+                    ["classic", "Oddiy"],
+                    ["centered", "Markazda"],
+                    ["dark", "Rangli"],
+                  ]}
+                  onChange={(v) => setHeader({ variant: v })}
+                />
+              </div>
+              <div className="space-y-2 rounded-lg border border-line p-3">
+                <p className="text-xs font-semibold text-muted">Pastki qism (footer)</p>
+                <Segmented
+                  label="Dizayn"
+                  value={site.footer?.variant ?? "simple"}
+                  options={[
+                    ["simple", "Oddiy"],
+                    ["columns", "Ustunli"],
+                    ["dark", "Qorong'i"],
+                  ]}
+                  onChange={(v) => update((s) => ({ ...s, footer: { variant: v, text: s.footer?.text ?? "" } }))}
+                />
+                <TextField
+                  label="Matn"
+                  value={site.footer?.text ?? ""}
+                  placeholder={site.tagline || "Qisqa ma'lumot"}
+                  onChange={(v) => update((s) => ({ ...s, footer: { variant: s.footer?.variant ?? "simple", text: v } }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {(["primary", "accent"] as const).map((k) => (
@@ -1041,41 +1298,25 @@ export function SiteEditor({
             })}
           </div>
 
-          <div className="rounded-xl border border-dashed border-line bg-white p-3">
-            <button
-              type="button"
-              onClick={() => setPicker((v) => !v)}
-              className="w-full rounded-lg bg-brand-50 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100"
-            >
-              {picker ? "Yopish" : "+ Blok qo'shish"}
-            </button>
-            {picker && (
-              <>
-                <p className="mt-2 text-xs text-muted">{openBlock ? "Tanlangan blokdan keyin qo'shiladi" : "Sahifa oxiriga qo'shiladi"}</p>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  {BLOCK_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => addBlock(t)}
-                      className="flex flex-col items-center gap-1 rounded-lg border border-line px-1 py-2.5 text-center text-xs hover:border-brand-500 hover:bg-brand-50"
-                    >
-                      <span className="text-xl">{BLOCK_ICONS[t]}</span>
-                      <span className="leading-tight">{BLOCK_LABELS[t]}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <p className="px-1 text-xs text-muted">💡 O&apos;ng tomondagi saytda blokni bosib tanlang. Ro&apos;yxatda ⋮⋮ dan sudrab joyini o&apos;zgartiring.</p>
+          <button
+            type="button"
+            onClick={() => setLibrary({ afterId: openBlock })}
+            className="w-full rounded-xl border-2 border-dashed border-brand-500/40 bg-white py-3 text-sm font-semibold text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+          >
+            + Blok qo&apos;shish
+          </button>
+          <p className="px-1 text-xs text-muted">💡 Saytdagi matnni bosib shu joyida yozing. Blokni bosib tanlang, ⋮⋮ dan sudrab joyini o&apos;zgartiring. Ctrl+Z — orqaga.</p>
         </div>
 
         {/* O'ng panel: jonli ko'rinish */}
-        <div className={`lg:sticky lg:top-4 lg:h-[calc(100dvh-2rem)] ${mobileView === "edit" ? "hidden lg:block" : "h-[75dvh]"}`}>
+        <div className={`${fullscreen ? "min-h-0 lg:h-full" : "lg:sticky lg:top-4 lg:h-[calc(100dvh-2rem)]"} ${mobileView === "edit" ? "hidden lg:block" : "h-[75dvh]"}`}>
           {preview}
         </div>
       </div>
+
+      {library && (
+        <LibraryModal site={site} shop={shop} onClose={() => setLibrary(null)} onPick={(type, variant) => addBlockAt(type, variant, library.afterId)} />
+      )}
     </div>
   );
 }

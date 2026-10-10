@@ -52,6 +52,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "split",
         id: bid(),
         heading: `${d.businessName} — sifatli mahsulotlar qulay narxda`,
         subheading: "Buyurtma bering, biz tez yetkazib beramiz.",
@@ -93,6 +94,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "classic",
         id: bid(),
         heading: `${d.businessName} — yangi uzilgan gullar`,
         subheading: "Har qanday bayram uchun chiroyli buketlar. Shahar bo'ylab yetkazib beramiz.",
@@ -103,6 +105,7 @@ const TEMPLATES: TemplateDef[] = [
       { type: "shop", id: bid(), heading: "Buketlarimiz", subheading: "Buketni tanlang, savatga qo'shing — yetkazib beramiz" },
       {
         type: "features",
+        variant: "icons",
         id: bid(),
         heading: "Biz bilan qulay",
         items: [
@@ -124,6 +127,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "image",
         id: bid(),
         heading: `${d.businessName} — mazali taomlar`,
         subheading: "Issiq va yangi taomlar. Kafeda yoki yetkazib berish bilan.",
@@ -150,6 +154,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "minimal",
         id: bid(),
         heading: `${d.businessName} — ishonchli xizmat`,
         subheading: "Tajribali mutaxassislar, aniq muddat va halol narx.",
@@ -191,6 +196,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "split",
         id: bid(),
         heading: `${d.businessName}`,
         subheading: "Sizning go'zalligingiz — bizning ishimiz. Oldindan yoziling.",
@@ -222,6 +228,7 @@ const TEMPLATES: TemplateDef[] = [
     build: (d) => [
       {
         type: "hero",
+        variant: "classic",
         id: bid(),
         heading: d.businessName,
         subheading: "Bu yerga qisqa tavsif yozing.",
@@ -245,6 +252,8 @@ export function buildFromTemplate(id: TemplateId, details: TemplateDetails): Sit
     tagline: "",
     language: "uz",
     theme: tpl.theme,
+    header: { logo: "", showNav: true, ctaText: "", ctaLink: "", variant: id === "beauty" ? "centered" : "classic" },
+    footer: { variant: id === "blank" ? "simple" : "columns", text: "" },
     pages: [{ slug: "home", title: "Bosh sahifa", blocks: tpl.build(details) }],
   });
 }
