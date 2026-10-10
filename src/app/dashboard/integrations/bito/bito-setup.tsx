@@ -20,15 +20,20 @@ export function BitoConnect() {
     <div className="space-y-5">
       <section className="rounded-2xl border border-line bg-white p-5">
         <h2 className="font-semibold">Kalitni qayerdan olaman?</h2>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-          <li>Bito tizimiga kiring.</li>
+        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm">
           <li>
-            <b>Sozlamalar → Integratsiya</b> (API) bo&apos;limini oching va yangi API kalit yarating.
+            Bito chap menyusida <b>Integratsiyalar → Integratsiyalar</b> ni oching.
           </li>
           <li>
-            Kalitni <b>to&apos;liq</b> nusxalang — u <code className="rounded bg-surface px-1">username:secret</code> ko&apos;rinishida bo&apos;ladi.
+            <b>Custom integratsiya</b> → <b>Tashqi integratsiya</b> qatorida <b>+ Yaratish</b> → nom yozing (masalan &quot;TezDo&apos;kon&quot;) → <b>Saqlash</b>.
           </li>
-          <li>Pastdagi maydonga joylang va &quot;Ulash&quot;ni bosing.</li>
+          <li>
+            Chiqqan oynadagi <b>API Key</b> ni nusxalang (<code className="rounded bg-surface px-1">login:kalit</code> ko&apos;rinishida). Client ID va Secret kerak emas.
+          </li>
+          <li>
+            <b>Muhim:</b> Integratsiyalar sahifasida <b>O&apos;rnatilgan</b> ro&apos;yxatidan yangi integratsiyani ochib <b>O&apos;rnatish</b> tugmasini bosing. Busiz kalit ishlamaydi.
+          </li>
+          <li>Kalitni pastdagi maydonga joylang va &quot;Ulash&quot;ni bosing.</li>
         </ol>
         <p className="mt-3 text-xs text-muted">Kalit faqat serverda shifrlangan holda saqlanadi, keyin hech kimga (sizga ham) ko&apos;rsatilmaydi.</p>
       </section>

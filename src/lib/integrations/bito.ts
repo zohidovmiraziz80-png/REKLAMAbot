@@ -46,8 +46,10 @@ export async function bito<T>(creds: BitoCreds, method: "GET" | "POST" | "PUT", 
     const json = (await res.json().catch(() => ({}))) as Envelope<T>;
     if (json.code !== 0) {
       const status = json.status_code ?? res.status;
-      const msg =
-        status === 401
+      const raw = json.message ?? "";
+      const msg = /not installed/i.test(raw)
+        ? "Integratsiya Bito'da hali o'rnatilmagan. Bito → Integratsiyalar → O'rnatilgan ro'yxatidan integratsiyani ochib \"O'rnatish\" tugmasini bosing, keyin qayta urinib ko'ring."
+        : status === 401
           ? "API kalit noto'g'ri yoki muddati tugagan"
           : status === 403
             ? "API kalitga bu amal uchun ruxsat berilmagan"
