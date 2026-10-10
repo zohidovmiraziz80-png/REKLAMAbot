@@ -58,7 +58,7 @@ export function BitoConnect() {
             type="password"
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            autoComplete="off"
+            autoComplete="new-password"
             spellCheck={false}
             placeholder="username:secret"
             className={`${input} font-mono`}

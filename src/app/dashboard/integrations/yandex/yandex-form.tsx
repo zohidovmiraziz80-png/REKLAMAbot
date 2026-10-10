@@ -93,7 +93,7 @@ export function YandexForm({ setup }: { setup: YandexSetup }) {
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            autoComplete="off"
+            autoComplete="new-password"
             spellCheck={false}
             placeholder={setup.keyHint ? `Saqlangan (${setup.keyHint}) — o'zgartirish uchun yangisini kiriting` : "Tokenni joylang"}
             className={`${input} font-mono`}

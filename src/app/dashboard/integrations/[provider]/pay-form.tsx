@@ -137,7 +137,7 @@ export function PayForm({ setup }: { setup: PaySetup }) {
             type="password"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
-            autoComplete="off"
+            autoComplete="new-password"
             spellCheck={false}
             placeholder={setup.keyHint ? `Saqlangan (${setup.keyHint}) — o'zgartirish uchun yangisini kiriting` : "Kalitni joylang"}
             className={`${input} font-mono`}

@@ -69,7 +69,7 @@ export function ConnectForm({ projectId, encryptionReady }: { projectId: string;
             value={token}
             onChange={(e) => setToken(e.target.value)}
             type="password"
-            autoComplete="off"
+            autoComplete="new-password"
             spellCheck={false}
             placeholder="123456789:AAH..."
             className="block w-full rounded-lg border border-line px-3.5 py-2.5 font-mono text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
