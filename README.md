@@ -5,7 +5,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Holat:** 4-bosqich (Telegram Bot Builder) — BotFather tokeni bilan bot ulash (token shifrlanadi), menyu tugmalari va javoblar, ariza/buyurtma qabul qilish, egaga Telegram orqali xabar, arizalar ro'yxati.
+**Tariflar:** Bot, Sayt, Sayt + Bot. Yangi mijoz 14 kunlik "Sayt + Bot" sinov bilan boshlaydi; admin `/admin/workspaces` dan tarif/narxni boshqaradi (onlayn to'lov keyin). Bot sayt­ni Telegram ichida Mini App sifatida ochadi.
+
+**4-bosqich (Telegram Bot Builder)** — BotFather tokeni bilan bot ulash (token shifrlanadi), menyu tugmalari va javoblar, ariza/buyurtma qabul qilish, egaga Telegram orqali xabar, arizalar ro'yxati.
 
 **3-bosqich (Nashr qilish)** — sayt `/s/<nom>` manzilida internetga chiqadi; asosiy domen ulanganda `<nom>.<domen>` subdomeni; o'z domenini ulash (Vercel API) va `/admin/domains` admin paneli.
 
@@ -21,7 +23,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql` → `..._bots.sql`) joylab **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql` → `..._bots.sql` → `..._plans.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari

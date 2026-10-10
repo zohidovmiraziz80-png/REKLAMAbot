@@ -18,6 +18,7 @@ export const NAV_ITEMS: NavItem[] = [
   { slug: "orders", label: "Buyurtmalar", soon: true, description: "Sayt va botdan kelgan buyurtmalar, yetkazish holati." },
   { slug: "customers", label: "Mijozlar", soon: true, description: "Mijozlar bazasi va xaridlar tarixi (CRM)." },
   { slug: "integrations", label: "Integratsiyalar", soon: true, description: "Bito, Yandex Delivery, BTS, Fargo va to'lov tizimlari." },
+  { slug: "plan", label: "Tarif" },
   { slug: "settings", label: "Sozlamalar", soon: true, description: "Profil, workspace, jamoa a'zolari va tarif." },
 ];
 

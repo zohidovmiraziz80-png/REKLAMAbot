@@ -23,6 +23,9 @@ Asosiy bozor: O'zbekiston. Interfeys tili o'zbek tili (lotin yozuvi), keyinroq r
 3. **AI butun platformani boshqaradi.** Har bir funksiya `src/actions/` ichida alohida "amal" sifatida yoziladi.
    - Interfeys tugmalari ham, AI Assistant ham aynan shu amallarni chaqiradi.
 
+4. **Tariflar.** `bot` (faqat bot), `site` (faqat sayt), `site_bot` (ikkalasi). Yangi workspace — 14 kun `site_bot` sinov. Imkoniyat tekshiruvi `requireFeature()` (src/actions/plan-guard.ts) orqali amallar qatlamida. Tarifni faqat admin o'zgartiradi (admin_set_workspace_plan).
+5. **Bot + sayt.** Bot asosan saytni Telegram ichida Mini App (web_app) sifatida ochadi; chatda ariza yig'ish ixtiyoriy tugma turi.
+
 ## Texnologiyalar
 
 | Vazifa | Texnologiya |

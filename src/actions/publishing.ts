@@ -19,6 +19,7 @@ import {
 } from "@/lib/vercel/domains";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
+import { requireFeature } from "./plan-guard";
 
 const MAX_DOMAINS_PER_SITE = 3;
 
@@ -117,6 +118,7 @@ export const publishWebsite = defineAction({
   }),
   handler: async (ctx, input): Promise<{ slug: string; publishedAt: string }> => {
     const project = await loadWebsiteProject(ctx, input.projectId);
+    await requireFeature(ctx, "sites");
     const slug = normalizeSlug(input.slug);
     if (!SLUG_RE.test(slug)) {
       throw new ActionError("validation", "Manzil 3–40 belgidan iborat bo'lsin: lotin harflari, raqamlar va chiziqcha (-)");

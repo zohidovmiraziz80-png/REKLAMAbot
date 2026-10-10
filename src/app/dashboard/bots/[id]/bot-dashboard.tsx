@@ -59,12 +59,19 @@ function ChatPreview({ username, config }: { username: string; config: BotConfig
         <div className="ml-auto w-fit rounded-xl rounded-br-sm bg-[#effdde] px-3 py-1.5 text-sm">/start</div>
         <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white px-3 py-2 text-sm whitespace-pre-line shadow-sm">{config.welcome}</div>
       </div>
+      <div className="flex items-center gap-2 border-t border-black/5 bg-white px-2 py-2">
+        <span className="rounded-md bg-[#517da2] px-2 py-1 text-xs font-semibold text-white">
+          {config.siteUrl ? `🛍 ${config.menuButtonText || "Do'kon"}` : "☰ Menyu"}
+        </span>
+        <span className="flex-1 text-xs text-muted">Xabar yozing...</span>
+      </div>
       <div className="space-y-1.5 border-t border-black/5 bg-[#f4f4f5] p-2">
         {rows.length === 0 && <p className="py-2 text-center text-xs text-muted">Menyu tugmalari yo&apos;q</p>}
         {rows.map((row, i) => (
           <div key={i} className="flex gap-1.5">
             {row.map((b) => (
               <span key={b.id} className="flex-1 truncate rounded-md bg-white px-2 py-2 text-center text-xs font-medium shadow-sm">
+                {b.type === "webapp" && "↗ "}
                 {b.label}
               </span>
             ))}
@@ -165,9 +172,13 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
     startSave(async () => {
       const r = await saveBotConfigAction(initial.projectId, config);
       if (r.ok) {
-        setConfig(r.data);
+        setConfig(r.data.config);
         setDirty(false);
-        setStatus({ kind: "ok", text: "Saqlandi — bot darhol yangi menyu bilan ishlaydi" });
+        setStatus(
+          r.data.menuButtonSynced
+            ? { kind: "ok", text: "Saqlandi — bot darhol yangi menyu bilan ishlaydi" }
+            : { kind: "error", text: "Saqlandi, lekin Telegram menyu tugmasini yangilamadi. Birozdan keyin qayta saqlang." },
+        );
       } else setStatus({ kind: "error", text: r.error });
     });
   }
@@ -262,6 +273,47 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="space-y-4">
+            <section className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4">
+              <div>
+                <h2 className="text-sm font-semibold">🛍 Sayt bot ichida (Mini App)</h2>
+                <p className="text-xs text-muted">
+                  Mijoz xabar maydoni yonidagi tugmani bosganda saytingiz Telegram ichida ochiladi — buyurtma saytda beriladi.
+                </p>
+              </div>
+              {initial.sites.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {initial.sites.map((site) => (
+                    <button
+                      key={site.url}
+                      type="button"
+                      onClick={() => update({ siteUrl: site.url })}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium ${config.siteUrl === site.url ? "border-brand-500 bg-white text-brand-700" : "border-line bg-white hover:border-brand-500"}`}
+                    >
+                      {site.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
+                <input
+                  value={config.siteUrl}
+                  onChange={(e) => update({ siteUrl: e.target.value })}
+                  placeholder="https://... (bo'sh qoldirsangiz, menyu tugmasi oddiy bo'ladi)"
+                  className={input}
+                />
+                <input
+                  value={config.menuButtonText}
+                  onChange={(e) => update({ menuButtonText: e.target.value })}
+                  maxLength={20}
+                  placeholder="Tugma nomi"
+                  className={input}
+                />
+              </div>
+              {initial.sites.length === 0 && (
+                <p className="text-xs text-muted">Hali nashr qilingan saytingiz yo&apos;q. Saytni nashr qilsangiz, shu yerda tanlash mumkin bo&apos;ladi yoki istalgan https manzilni yozing.</p>
+              )}
+            </section>
+
             <section className="space-y-2 rounded-xl border border-line bg-white p-4">
               <h2 className="text-sm font-semibold">Salomlashish xabari</h2>
               <p className="text-xs text-muted">Mijoz botni ochib Start bosganda yuboriladi.</p>
@@ -315,6 +367,17 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
                       placeholder="Tugma bosilganda yuboriladigan javob"
                       className={input}
                     />
+                  )}
+                  {b.type === "webapp" && (
+                    <div className="space-y-1">
+                      <input
+                        value={b.url}
+                        onChange={(e) => updateButton(b.id, { url: e.target.value })}
+                        placeholder="Bo'sh — yuqoridagi Mini App sayti ochiladi"
+                        className={input}
+                      />
+                      <p className="text-xs text-muted">Tugma bosilganda sayt Telegram ichida ochiladi.</p>
+                    </div>
                   )}
                   {b.type === "link" && (
                     <div className="grid gap-2 sm:grid-cols-2">

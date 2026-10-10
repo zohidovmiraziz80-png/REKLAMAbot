@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ActionError, defineAction } from "./define";
 import { logAudit } from "./audit";
+import { requireFeature } from "./plan-guard";
 import { PROJECT_TYPES, type Project } from "./project-types";
 
 export { PROJECT_TYPES, type Project, type ProjectType } from "./project-types";
@@ -19,6 +20,8 @@ export const createProject = defineAction({
     type: z.enum(PROJECT_TYPES),
   }),
   handler: async (ctx, input): Promise<Project> => {
+    if (input.type === "website") await requireFeature(ctx, "sites");
+    if (input.type === "bot") await requireFeature(ctx, "bots");
     const { data, error } = await ctx.supabase
       .from("projects")
       .insert({

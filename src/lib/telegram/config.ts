@@ -10,10 +10,11 @@ const txt = (max: number, fallback = "") =>
     .transform((s) => s.trim().slice(0, max))
     .catch(fallback);
 
-export const BUTTON_TYPES = ["text", "request", "link"] as const;
+export const BUTTON_TYPES = ["webapp", "text", "link", "request"] as const;
 export type BotButtonType = (typeof BUTTON_TYPES)[number];
 
 export const BUTTON_TYPE_LABELS: Record<BotButtonType, string> = {
+  webapp: "Saytni bot ichida ochish (Mini App)",
   text: "Matnli javob",
   request: "Ariza / buyurtma qabul qilish",
   link: "Havola (sayt, kanal)",
@@ -57,22 +58,37 @@ export const botConfigSchema = z.object({
   requestPhonePrompt: txt(300, DEFAULT_TEXTS.requestPhonePrompt),
   requestMessagePrompt: txt(300, DEFAULT_TEXTS.requestMessagePrompt),
   requestThanks: txt(300, DEFAULT_TEXTS.requestThanks),
+  /** Xabar yozish maydoni yonidagi menyu tugmasi ochadigan sayt (Mini App) */
+  siteUrl: txt(300),
+  menuButtonText: txt(20, "Do'kon"),
 });
 
 export type BotConfig = z.output<typeof botConfigSchema>;
 
-export function defaultBotConfig(businessName: string): BotConfig {
+export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig {
   return {
     welcome: `Assalomu alaykum! ${businessName} botiga xush kelibsiz. Kerakli bo'limni tanlang 👇`,
     buttons: [
+      { id: "shop", label: "🛍 Do'konni ochish", type: "webapp", text: "", url: siteUrl },
       { id: "about", label: "ℹ️ Biz haqimizda", type: "text", text: `${businessName} haqida qisqacha ma'lumot yozing.`, url: "" },
-      { id: "order", label: "🛒 Buyurtma berish", type: "request", text: "", url: "" },
       { id: "contact", label: "📞 Aloqa", type: "text", text: "Telefon: \nManzil: \nIsh vaqti: ", url: "" },
     ],
     requestPhonePrompt: DEFAULT_TEXTS.requestPhonePrompt,
     requestMessagePrompt: DEFAULT_TEXTS.requestMessagePrompt,
     requestThanks: DEFAULT_TEXTS.requestThanks,
+    siteUrl,
+    menuButtonText: "Do'kon",
   };
+}
+
+/** Mini App uchun faqat https manzil */
+export function safeWebAppUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw.trim());
+    return u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Telegram'da ochiladigan xavfsiz havola (faqat https) */

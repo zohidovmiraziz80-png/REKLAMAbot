@@ -8,6 +8,7 @@ import { SITE_TOOL } from "@/lib/site/tool-schema";
 import { normalizeUzPhone, formatUzPhone } from "@/lib/phone";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
+import { requireFeature } from "./plan-guard";
 
 const AI_DAILY_LIMIT = 30;
 
@@ -181,6 +182,7 @@ export const createWebsiteFromTemplate = defineAction({
   }),
   handler: async (ctx, input): Promise<WebsiteRecord> => {
     const project = await loadProject(ctx, input.projectId);
+    await requireFeature(ctx, "sites");
     const phone = input.details.phone ? normalizeUzPhone(input.details.phone) : null;
     if (input.details.phone && !phone) {
       throw new ActionError("validation", "Telefon raqami noto'g'ri. Masalan: +998 90 123 45 67");

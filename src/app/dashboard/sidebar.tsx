@@ -7,7 +7,7 @@ import { Logo } from "@/components/logo";
 import { signOut } from "../(auth)/actions";
 import { NAV_ITEMS } from "./nav";
 
-export function Sidebar({ userName, workspaceName }: { userName: string; workspaceName: string }) {
+export function Sidebar({ userName, workspaceName, isAdmin = false }: { userName: string; workspaceName: string; isAdmin?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -60,6 +60,11 @@ export function Sidebar({ userName, workspaceName }: { userName: string; workspa
           </nav>
 
           <div className="mt-4 border-t border-line pt-4">
+            {isAdmin && (
+              <Link href="/admin" className="mb-2 flex items-center justify-between rounded-lg bg-ink px-3 py-2 text-sm font-semibold text-white">
+                Admin panel <span>→</span>
+              </Link>
+            )}
             <p className="truncate px-3 text-sm font-medium">{userName}</p>
             <form action={signOut}>
               <button type="submit" className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-surface hover:text-ink">

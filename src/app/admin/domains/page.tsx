@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/server";
 import { isDomainApiConfigured } from "@/lib/vercel/domains";
 import { DomainAdminButtons } from "./domain-actions";
+import { AdminHeader } from "../admin-header";
 
 export const metadata: Metadata = { title: "Admin · Domenlar", robots: { index: false } };
 
@@ -47,12 +47,7 @@ export default async function AdminDomainsPage() {
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Logo href="/dashboard" />
-          <span className="rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white">Admin panel</span>
-        </div>
-      </header>
+      <AdminHeader active="domains" />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Domenlar</h1>
         <p className="mt-1 text-muted">Platformaga ulangan barcha o&apos;z domenlari va ularning holati.</p>

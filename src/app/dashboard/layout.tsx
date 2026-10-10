@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { getActiveWorkspace } from "@/lib/workspace";
+import { getWorkspacePlan } from "@/lib/plans";
 import { Sidebar } from "./sidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,12 +13,32 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login?next=/dashboard");
 
   const workspace = await getActiveWorkspace(supabase, user.id);
+  const [plan, { data: isAdmin }] = await Promise.all([
+    workspace ? getWorkspacePlan(supabase, workspace.id) : Promise.resolve(null),
+    supabase.rpc("is_platform_admin"),
+  ]);
   const userName = (user.user_metadata?.full_name as string | undefined) ?? user.email ?? "Foydalanuvchi";
 
   return (
     <div className="min-h-dvh lg:flex">
-      <Sidebar userName={userName} workspaceName={workspace?.name ?? "Workspace"} />
+      <Sidebar userName={userName} workspaceName={workspace?.name ?? "Workspace"} isAdmin={isAdmin === true} />
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
+        {plan && plan.status !== "active" && (
+          <div
+            className={`mx-auto mb-6 flex max-w-6xl flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm ${
+              plan.status === "expired" ? "border border-red-200 bg-red-50 text-red-800" : "border border-accent-100 bg-accent-50 text-ink"
+            }`}
+          >
+            <span>
+              {plan.status === "trial"
+                ? `Sinov muddati: yana ${plan.daysLeft} kun barcha imkoniyatlar ochiq.`
+                : "Sinov muddati tugagan. Yangi sayt/bot yaratish va nashr qilish uchun tarifni faollashtiring."}
+            </span>
+            <Link href="/dashboard/plan" className="font-semibold text-brand-700 hover:underline">
+              Tariflarni ko&apos;rish →
+            </Link>
+          </div>
+        )}
         {workspace ? (
           children
         ) : (

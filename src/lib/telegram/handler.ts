@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { tg } from "./api";
-import { botConfigSchema, safeBotUrl, type BotConfig } from "./config";
+import { botConfigSchema, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
 
 /**
  * Telegram'dan kelgan har bir xabarni qayta ishlaydi:
@@ -34,9 +34,14 @@ const SHARE_PHONE = "📱 Raqamni yuborish";
 
 function menuKeyboard(cfg: BotConfig) {
   if (!cfg.buttons.length) return { remove_keyboard: true };
-  const rows: { text: string }[][] = [];
+  const rows: { text: string; web_app?: { url: string } }[][] = [];
   for (let i = 0; i < cfg.buttons.length; i += 2) {
-    rows.push(cfg.buttons.slice(i, i + 2).map((b) => ({ text: b.label })));
+    rows.push(
+      cfg.buttons.slice(i, i + 2).map((b) => {
+        const url = b.type === "webapp" ? safeWebAppUrl(b.url || cfg.siteUrl) : null;
+        return url ? { text: b.label, web_app: { url } } : { text: b.label };
+      }),
+    );
   }
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
@@ -108,6 +113,12 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       return;
     }
     await send(cfg.welcome, menuKeyboard(cfg));
+    const siteUrl = safeWebAppUrl(cfg.siteUrl);
+    if (siteUrl) {
+      await send("👇 Do'konimizni Telegram ichida oching", {
+        inline_keyboard: [[{ text: `🛍 ${cfg.menuButtonText || "Do'kon"}`, web_app: { url: siteUrl } }]],
+      });
+    }
     return;
   }
 
@@ -168,6 +179,13 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     if (button.type === "request") {
       await setState({ step: "phone" });
       await send(cfg.requestPhonePrompt, phoneKeyboard());
+      return;
+    }
+    if (button.type === "webapp") {
+      // Mini App tugmasi odatda to'g'ridan-to'g'ri saytni ochadi; bu yerga faqat manzil noto'g'ri bo'lsa keladi
+      const url = safeWebAppUrl(button.url || cfg.siteUrl);
+      if (url) await send("👇 Saytni ochish", { inline_keyboard: [[{ text: button.label, web_app: { url } }]] });
+      else await send("Sayt hali ulanmagan.", menuKeyboard(cfg));
       return;
     }
     if (button.type === "link") {

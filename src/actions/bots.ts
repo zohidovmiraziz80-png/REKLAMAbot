@@ -3,9 +3,11 @@ import { decryptSecret, encryptSecret, isEncryptionConfigured, randomToken } fro
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { BOT_TOKEN_RE, TelegramError, tg, type TgBotInfo } from "@/lib/telegram/api";
-import { botConfigSchema, defaultBotConfig, type BotConfig } from "@/lib/telegram/config";
+import { botConfigSchema, defaultBotConfig, safeWebAppUrl, type BotConfig } from "@/lib/telegram/config";
+import { publicSiteUrls } from "@/lib/site/hosting";
 import { ActionError, defineAction, type ActionContext } from "./define";
 import { logAudit } from "./audit";
+import { requireFeature } from "./plan-guard";
 
 /** Vercel'ning barcha domenlariga xizmat qiluvchi doimiy IP (Vercel hujjatlaridagi A yozuvi) */
 const VERCEL_EDGE_IP = "76.76.21.21";
@@ -36,7 +38,31 @@ export type BotInfo = {
   subscribers: number;
   requests: BotRequest[];
   encryptionReady: boolean;
+  /** Workspace'dagi nashr qilingan saytlar — Mini App uchun tanlash */
+  sites: { name: string; url: string }[];
 };
+
+async function publishedSites(ctx: ActionContext) {
+  const { data: pubs } = await ctx.supabase.from("published_sites").select("project_id, slug").eq("workspace_id", ctx.workspaceId);
+  if (!pubs?.length) return [];
+  const { data: projects } = await ctx.supabase
+    .from("projects")
+    .select("id, name")
+    .in("id", pubs.map((p) => p.project_id as string));
+  const names = new Map((projects ?? []).map((p) => [p.id as string, p.name as string]));
+  return pubs.map((p) => {
+    const urls = publicSiteUrls(p.slug as string);
+    return { name: names.get(p.project_id as string) ?? (p.slug as string), url: urls.subdomainUrl ?? urls.pathUrl };
+  });
+}
+
+/** Xabar maydoni yonidagi menyu tugmasini Mini App'ga yoki oddiy buyruqlar menyusiga o'rnatadi */
+async function syncMenuButton(token: string, config: BotConfig) {
+  const url = safeWebAppUrl(config.siteUrl);
+  await tg(token, "setChatMenuButton", {
+    menu_button: url ? { type: "web_app", text: config.menuButtonText || "Do'kon", web_app: { url } } : { type: "commands" },
+  });
+}
 
 async function loadBotProject(ctx: ActionContext, projectId: string) {
   const { data, error } = await ctx.supabase
@@ -83,7 +109,7 @@ export const getBot = defineAction({
       .eq("project_id", project.id)
       .maybeSingle();
 
-    const [{ count }, { data: requests }] = await Promise.all([
+    const [{ count }, { data: requests }, sites] = await Promise.all([
       ctx.supabase.from("bot_subscribers").select("id", { count: "exact", head: true }).eq("project_id", project.id),
       ctx.supabase
         .from("bot_requests")
@@ -91,6 +117,7 @@ export const getBot = defineAction({
         .eq("project_id", project.id)
         .order("created_at", { ascending: false })
         .limit(50),
+      publishedSites(ctx),
     ]);
 
     return {
@@ -100,12 +127,13 @@ export const getBot = defineAction({
       username: (bot?.username as string | undefined) ?? null,
       ownerLinked: !!bot?.owner_chat_id,
       ownerLink: bot ? `https://t.me/${bot.username}?start=owner_${bot.owner_link_code}` : null,
-      config: bot ? botConfigSchema.parse(bot.config ?? {}) : defaultBotConfig(project.name),
+      config: bot ? botConfigSchema.parse(bot.config ?? {}) : defaultBotConfig(project.name, sites[0]?.url ?? ""),
       status: (bot?.status as BotInfo["status"]) ?? null,
       lastError: (bot?.last_error as string | null | undefined) ?? null,
       subscribers: count ?? 0,
       requests: (requests ?? []) as BotRequest[],
       encryptionReady: isEncryptionConfigured(),
+      sites,
     };
   },
 });
@@ -118,6 +146,7 @@ export const connectBot = defineAction({
   input: z.object({ projectId: z.string().uuid(), token: z.string().trim().max(100) }),
   handler: async (ctx, input): Promise<{ username: string }> => {
     const project = await loadBotProject(ctx, input.projectId);
+    await requireFeature(ctx, "bots");
     if (!BOT_TOKEN_RE.test(input.token)) {
       throw new ActionError("validation", "Token formati noto'g'ri. U 123456789:ABC... ko'rinishida bo'ladi.");
     }
@@ -177,6 +206,14 @@ export const connectBot = defineAction({
       // ixtiyoriy
     }
 
+    const sites = await publishedSites(ctx);
+    const config = existing ? botConfigSchema.parse(existing.config ?? {}) : defaultBotConfig(project.name, sites[0]?.url ?? "");
+    try {
+      await syncMenuButton(input.token, config);
+    } catch {
+      // ixtiyoriy
+    }
+
     const row = {
       telegram_bot_id: me.id,
       username: me.username,
@@ -193,7 +230,7 @@ export const connectBot = defineAction({
           project_id: project.id,
           workspace_id: ctx.workspaceId,
           owner_link_code: randomToken(8),
-          config: defaultBotConfig(project.name),
+          config,
           created_by: ctx.user.id,
         });
     if (error) throw new ActionError("internal", "Bot saqlanmadi");
@@ -209,15 +246,30 @@ export const saveBotConfig = defineAction({
   name: "saveBotConfig",
   description: "Bot menyusi, salomlashish matni va ariza matnlarini saqlaydi",
   input: z.object({ projectId: z.string().uuid(), config: z.unknown() }),
-  handler: async (ctx, input): Promise<BotConfig> => {
+  handler: async (ctx, input): Promise<{ config: BotConfig; menuButtonSynced: boolean }> => {
     const project = await loadBotProject(ctx, input.projectId);
     const config = botConfigSchema.parse(input.config ?? {});
+    if (config.siteUrl && !safeWebAppUrl(config.siteUrl)) {
+      throw new ActionError("validation", "Mini App manzili https:// bilan boshlanishi kerak");
+    }
     const db = admin();
-    const { data, error } = await db.from("bots").update({ config }).eq("project_id", project.id).select("project_id").maybeSingle();
+    const { data, error } = await db
+      .from("bots")
+      .update({ config })
+      .eq("project_id", project.id)
+      .select("token_encrypted")
+      .maybeSingle();
     if (error) throw new ActionError("internal", "Sozlamalar saqlanmadi");
     if (!data) throw new ActionError("not_found", "Avval botni ulang");
+
+    let menuButtonSynced = true;
+    try {
+      await syncMenuButton(decryptSecret(data.token_encrypted as string), config);
+    } catch {
+      menuButtonSynced = false;
+    }
     await logAudit(ctx, "bot.config", { type: "project", id: project.id });
-    return config;
+    return { config, menuButtonSynced };
   },
 });
 
