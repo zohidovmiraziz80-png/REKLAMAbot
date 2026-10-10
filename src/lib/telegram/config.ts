@@ -64,6 +64,12 @@ export const botConfigSchema = z.object({
   /** Xabar yozish maydoni yonidagi menyu tugmasi ochadigan sayt (Mini App) */
   siteUrl: txt(300),
   menuButtonText: txt(20, "Do'kon"),
+  /** AI yordamchi: botda erkin savollarga javob beradi */
+  aiBot: z.boolean().catch(false),
+  /** AI konsultant: saytda chat oynasi */
+  aiSite: z.boolean().catch(false),
+  /** AI uchun qo'shimcha ma'lumot va ohang (ish vaqti, kafolat, yetkazish shartlari...) */
+  aiInstructions: txt(2000),
 });
 
 export type BotConfig = z.output<typeof botConfigSchema>;
@@ -81,6 +87,9 @@ export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig 
     requestThanks: DEFAULT_TEXTS.requestThanks,
     siteUrl,
     menuButtonText: "Do'kon",
+    aiBot: false,
+    aiSite: false,
+    aiInstructions: "",
   };
 }
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { handleOwnerReply, logIncoming } from "@/lib/chat";
+import { handleOwnerReply, logAiReply, logIncoming, recentHistory } from "@/lib/chat";
+import { answerCustomer } from "@/lib/ai/assistant";
 import { handleChannelPost, matchPaymentText } from "@/lib/payments/card";
 import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
@@ -501,6 +502,25 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       return;
     }
     await send(button.text || "Ma'lumot tez orada qo'shiladi.", menu());
+    return;
+  }
+
+  // AI yordamchi: erkin savolga katalog asosida javob (soatiga 20 tagacha)
+  if (text && !text.startsWith("/") && cfg.aiBot) {
+    const { turns, aiLastHour } = await recentHistory(db, bot.project_id, chatId);
+    const logged = await logIncoming(db, bot, chatId, who, text);
+    if (aiLastHour < 20) {
+      try {
+        await tg(bot.token, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => undefined);
+        const answer = await answerCustomer(db, bot.workspace_id, { history: turns, question: text, channel: "telegram", instructions: cfg.aiInstructions });
+        await send(answer, menu());
+        if (logged) await logAiReply(db, bot, chatId, answer);
+        return;
+      } catch (err) {
+        console.error("AI javob bermadi:", err instanceof Error ? err.message : "xato");
+      }
+    }
+    await send(logged ? "✉️ Xabaringiz yetkazildi, tez orada javob beramiz." : "Iltimos, quyidagi menyudan tanlang 👇", menu());
     return;
   }
 

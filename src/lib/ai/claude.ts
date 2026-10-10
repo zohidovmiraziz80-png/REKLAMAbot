@@ -23,22 +23,25 @@ export class AIError extends Error {
 
 const GATEWAY_MODEL = process.env.AI_MODEL ?? "anthropic/claude-sonnet-5.5";
 const DIRECT_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
+// Mijoz bilan suhbat uchun tez va arzon model
+const GATEWAY_FAST = process.env.AI_FAST_MODEL ?? "anthropic/claude-haiku-5.5";
+const DIRECT_FAST = process.env.ANTHROPIC_FAST_MODEL ?? "claude-haiku-5-5";
 
 type Endpoint = { url: string; headers: Record<string, string>; model: string };
 
-async function resolveEndpoint(): Promise<Endpoint> {
+async function resolveEndpoint(fast = false): Promise<Endpoint> {
   if (process.env.AI_GATEWAY_API_KEY) {
     return {
       url: "https://ai-gateway.vercel.sh/v1/messages",
       headers: { authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}` },
-      model: GATEWAY_MODEL,
+      model: fast ? GATEWAY_FAST : GATEWAY_MODEL,
     };
   }
   if (process.env.ANTHROPIC_API_KEY) {
     return {
       url: "https://api.anthropic.com/v1/messages",
       headers: { "x-api-key": process.env.ANTHROPIC_API_KEY },
-      model: DIRECT_MODEL,
+      model: fast ? DIRECT_FAST : DIRECT_MODEL,
     };
   }
   let oidc: string | null = null;
@@ -52,8 +55,50 @@ async function resolveEndpoint(): Promise<Endpoint> {
   return {
     url: "https://ai-gateway.vercel.sh/v1/messages",
     headers: { authorization: `Bearer ${oidc}` },
-    model: GATEWAY_MODEL,
+    model: fast ? GATEWAY_FAST : GATEWAY_MODEL,
   };
+}
+
+/** Oddiy matnli javob (mijoz bilan suhbat) — tez model bilan */
+export async function callClaudeText({
+  system,
+  messages,
+  maxTokens = 700,
+  timeoutMs = 25_000,
+}: {
+  system: string;
+  messages: Message[];
+  maxTokens?: number;
+  timeoutMs?: number;
+}): Promise<string> {
+  const fastEp = await resolveEndpoint(true);
+  const send = (ep: Endpoint) =>
+    fetch(ep.url, {
+      method: "POST",
+      headers: { ...ep.headers, "content-type": "application/json", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: ep.model, max_tokens: maxTokens, system, messages }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  let res: Response;
+  try {
+    res = await send(fastEp);
+    // Tez model mavjud bo'lmasa — asosiy model bilan
+    if (res.status === 400 || res.status === 404) res = await send(await resolveEndpoint(false));
+  } catch {
+    throw new AIError("timeout", "AI javob berishga ulgurmadi");
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("AI xatosi", res.status, body.slice(0, 300));
+    if (res.status === 401 || res.status === 403) throw new AIError("not_configured", "AI xizmatiga kirish ruxsati yo'q");
+    if (res.status === 402 || /credit|billing|balance/i.test(body)) throw new AIError("no_credit", "AI hisobida mablag' tugagan");
+    if (res.status === 429) throw new AIError("rate_limited", "AI band");
+    throw new AIError("upstream", "AI xizmatida xato");
+  }
+  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  const text = (data.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("").trim();
+  if (!text) throw new AIError("bad_output", "AI bo'sh javob qaytardi");
+  return text;
 }
 
 export async function callClaudeTool({

@@ -107,6 +107,7 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
       payMethods,
       loginEnabled: bots.length > 0,
       telegramOnly: !plan.sitePublic,
+      aiChat: plan.active && bots.some((b) => (b.config as { aiSite?: boolean } | null)?.aiSite === true),
       botUsername: (mainBot?.username as string | undefined) ?? null,
     },
   };

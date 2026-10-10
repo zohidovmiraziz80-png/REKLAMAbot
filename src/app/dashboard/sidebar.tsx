@@ -82,8 +82,8 @@ function groups(newOrders: number): Group[] {
     {
       title: "AI",
       items: [
-        { label: "SI konsultant", icon: "ai", href: "/dashboard/ai-consultant", soon: true },
-        { label: "AI Telegram", icon: "telegram", href: "/dashboard/ai-telegram", soon: true },
+        { label: "SI konsultant", icon: "ai", href: "/dashboard/ai#site" },
+        { label: "AI Telegram", icon: "telegram", href: "/dashboard/ai#bot" },
       ],
     },
     {
@@ -110,7 +110,7 @@ function groups(newOrders: number): Group[] {
           ],
         },
         { label: "Xodimlar", icon: "staff", href: "/dashboard/settings#staff" },
-        { label: "Dastur", icon: "app", href: "/dashboard/app", soon: true },
+        { label: "Dastur", icon: "app", href: "/dashboard/app" },
       ],
     },
   ];

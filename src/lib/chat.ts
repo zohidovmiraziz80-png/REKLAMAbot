@@ -61,3 +61,33 @@ export async function sendToCustomer(db: SupabaseClient, bot: Bot, chatId: numbe
   await db.from("chat_messages").update({ read_at: new Date().toISOString() }).eq("project_id", bot.project_id).eq("chat_id", chatId).is("read_at", null);
   return true;
 }
+
+/** Suhbatning oxirgi xabarlari (AI kontekst uchun) */
+export async function recentHistory(db: SupabaseClient, projectId: string, chatId: number) {
+  const { data } = await db
+    .from("chat_messages")
+    .select("direction, text, created_at, sender_user_id")
+    .eq("project_id", projectId)
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  const rows = (data ?? []).reverse();
+  const hourAgo = Date.now() - 3600_000;
+  const aiLastHour = rows.filter((r) => r.direction === "out" && !r.sender_user_id && new Date(r.created_at as string).getTime() > hourAgo).length;
+  return {
+    turns: rows.map((r) => ({ role: (r.direction === "in" ? "user" : "assistant") as "user" | "assistant", content: r.text as string })),
+    aiLastHour,
+  };
+}
+
+/** AI javobini yozishmaga qo'shadi (sender_user_id = null — avtomatik javob) */
+export async function logAiReply(db: SupabaseClient, bot: Pick<Bot, "project_id" | "workspace_id">, chatId: number, text: string) {
+  await db.from("chat_messages").insert({
+    workspace_id: bot.workspace_id,
+    project_id: bot.project_id,
+    chat_id: chatId,
+    direction: "out",
+    text: `🤖 ${text}`.slice(0, 4096),
+    read_at: new Date().toISOString(),
+  });
+}

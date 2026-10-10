@@ -29,6 +29,8 @@ export type PublicShopSettings = {
   loginEnabled: boolean;
   /** "Bot" tarifi: sayt faqat Telegram Mini App ichida ochiladi */
   telegramOnly: boolean;
+  /** Saytdagi AI konsultant yoqilganmi */
+  aiChat: boolean;
   /** Do'konning asosiy boti (havola uchun) */
   botUsername: string | null;
   /** Ulangan onlayn to'lov usullari */

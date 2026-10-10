@@ -3,6 +3,7 @@ import { DEFAULT_BLOCK_STYLE, type Block, type BlockStyle, type Site, type SiteP
 import { instagramUrl, phoneUrl, safeHref, telegramUrl } from "@/lib/site/safe";
 import type { ShopData } from "@/lib/shop/types";
 import { AccountButton } from "./account";
+import { AiChat } from "./ai-chat";
 import { BlockScope, E, EditProvider } from "./editable";
 import { ShopPlaceholder, ShopSection, type ShopLayout } from "./shop";
 
@@ -953,6 +954,7 @@ export function SiteRenderer({
       </main>
 
       <SiteFooter site={site} basePath={basePath} />
+      {shop?.settings.aiChat && !shop.embedded && !editing && <AiChat slug={shop.slug} raised />}
     </div>
   );
 
