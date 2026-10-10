@@ -9,6 +9,7 @@ import { handleUpdate, type TgUpdate } from "@/lib/telegram/handler";
  */
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ botId: string }> }) {
   const { botId } = await params;

@@ -37,6 +37,7 @@ const body = z.object({
   tgLink: z.object({ bot: z.string().max(64), chat: z.string().max(64) }).nullable().default(null),
   payment: z.enum(["cash", "card", "payme", "click", "multicard"]).default("cash"),
   session: z.string().max(1200).default(""),
+  geo: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).nullable().default(null),
   returnUrl: z.string().max(500).default(""),
 });
 
@@ -182,6 +183,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const result = created as { id: string; number: number; total: number };
   if (input.payment !== "cash") await db.from("orders").update({ payment_method: input.payment }).eq("id", result.id);
+  // Mijoz joylashuvi (kuryer chaqirish uchun)
+  if (input.delivery === "courier" && input.geo) {
+    await db
+      .from("orders")
+      .update({ external_ids: { geo: `${input.geo.lat.toFixed(6)},${input.geo.lon.toFixed(6)}`, geo_src: "gps" } })
+      .eq("id", result.id);
+  }
 
   // Kartaga o'tkazma: noyob summa (kanalga tushgan SMS shu summa bo'yicha topiladi)
   let card: { number: string; holder: string; amount: number } | null = null;

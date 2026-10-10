@@ -2,15 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { runAction } from "@/actions/run";
 import { listOrders } from "@/actions/shop";
+import { getYandexSetup } from "@/actions/delivery";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/shop/format";
 import { OrdersList } from "./orders-list";
 
 export const metadata: Metadata = { title: "Buyurtmalar" };
+// Yandex kuryer chaqirish 20 soniyagacha davom etishi mumkin
+export const maxDuration = 60;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: raw } = await searchParams;
   const status = ORDER_STATUSES.includes(raw as OrderStatus) ? (raw as OrderStatus) : undefined;
-  const result = await runAction(listOrders, { status });
+  const [result, yandexSetup] = await Promise.all([runAction(listOrders, { status }), runAction(getYandexSetup, {})]);
+  const yandex = yandexSetup.ok && yandexSetup.data.connected && yandexSetup.data.status === "active";
   if (!result.ok) return <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{result.error}</p>;
   const { orders, counts } = result.data;
 
@@ -47,7 +51,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         })}
       </nav>
 
-      <OrdersList key={status ?? "all"} initial={orders} emptyAll={counts.all === 0} />
+      <OrdersList key={status ?? "all"} initial={orders} emptyAll={counts.all === 0} yandex={yandex} />
     </div>
   );
 }

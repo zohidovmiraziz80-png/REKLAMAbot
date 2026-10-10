@@ -1,4 +1,5 @@
 import type { ActionDefinition } from "./define";
+import { connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
 import { getCardPaySetup, saveCardPaySettings, unlinkPayChannel } from "./card-pay";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
 import {
@@ -82,6 +83,12 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   getCardPaySetup,
   saveCardPaySettings,
   unlinkPayChannel,
+  getYandexSetup,
+  connectYandex,
+  yandexEstimate,
+  yandexDispatch,
+  yandexRefresh,
+  yandexCancel,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,

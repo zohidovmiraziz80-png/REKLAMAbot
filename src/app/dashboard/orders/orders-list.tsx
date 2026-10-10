@@ -18,6 +18,7 @@ import {
   type PaymentStatus,
 } from "@/lib/shop/format";
 import { retryOrderSyncAction, updateOrderAction } from "./actions";
+import { YandexPanel } from "./yandex-panel";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   new: "bg-accent-50 text-accent-600",
@@ -29,7 +30,7 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
 
 const select = "rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500";
 
-export function OrdersList({ initial, emptyAll }: { initial: Order[]; emptyAll: boolean }) {
+export function OrdersList({ initial, emptyAll, yandex = false }: { initial: Order[]; emptyAll: boolean; yandex?: boolean }) {
   const [orders, setOrders] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(initial[0]?.status === "new" ? initial[0].id : null);
 
@@ -63,6 +64,7 @@ export function OrdersList({ initial, emptyAll }: { initial: Order[]; emptyAll: 
           order={o}
           open={openId === o.id}
           onToggle={() => setOpenId(openId === o.id ? null : o.id)}
+          yandex={yandex}
           onChange={(patch) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...patch } : x)))}
         />
       ))}
@@ -70,7 +72,19 @@ export function OrdersList({ initial, emptyAll }: { initial: Order[]; emptyAll: 
   );
 }
 
-function OrderCard({ order: o, open, onToggle, onChange }: { order: Order; open: boolean; onToggle: () => void; onChange: (p: Partial<Order>) => void }) {
+function OrderCard({
+  order: o,
+  open,
+  onToggle,
+  onChange,
+  yandex,
+}: {
+  order: Order;
+  open: boolean;
+  onToggle: () => void;
+  onChange: (p: Partial<Order>) => void;
+  yandex: boolean;
+}) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState(o.admin_note);
@@ -253,6 +267,9 @@ function OrderCard({ order: o, open, onToggle, onChange }: { order: Order; open:
                 </button>
               </div>
             ) : null}
+            {yandex && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.yandex) && (
+              <YandexPanel orderId={o.id} ext={o.external_ids ?? {}} onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })} />
+            )}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>

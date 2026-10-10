@@ -533,6 +533,8 @@ function CartDrawer({
   const [delivery, setDelivery] = useState<"pickup" | "courier">(s.deliveryEnabled && !s.pickupEnabled ? "courier" : "pickup");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
+  const [geo, setGeo] = useState<{ lat: number; lon: number } | null>(null);
+  const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
   type Pay = "cash" | "card" | "payme" | "click" | "multicard";
   const payOptions: Pay[] = [...(s.cashEnabled ? (["cash"] as const) : []), ...(s.cardEnabled ? (["card"] as const) : []), ...s.payMethods];
   const [payment, setPayment] = useState<Pay>(payOptions[0] ?? "cash");
@@ -578,6 +580,7 @@ function CartDrawer({
           tgLink: telegramLink(),
           payment,
           session: customer?.session ?? "",
+          geo: delivery === "courier" ? geo : null,
           returnUrl: window.location.href.split("?")[0],
         }),
       });
@@ -731,6 +734,26 @@ function CartDrawer({
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium">Manzil</span>
                     <textarea value={address} onChange={(e) => setAddress(e.target.value)} required minLength={5} maxLength={300} rows={2} className={input} placeholder="Shahar, ko'cha, uy, mo'ljal" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!navigator.geolocation) return setGeoState("error");
+                        setGeoState("busy");
+                        navigator.geolocation.getCurrentPosition(
+                          (p) => {
+                            setGeo({ lat: p.coords.latitude, lon: p.coords.longitude });
+                            setGeoState("idle");
+                          },
+                          () => setGeoState("error"),
+                          { enableHighAccuracy: true, timeout: 12000 },
+                        );
+                      }}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[color:var(--s-line)] px-3 py-1.5 text-xs font-medium"
+                    >
+                      {geo ? "✅ Joylashuv qo'shildi" : geoState === "busy" ? "Aniqlanmoqda…" : "📍 Joylashuvimni yuborish"}
+                    </button>
+                    {geoState === "error" && <span className="mt-1 block text-xs text-[color:var(--s-muted)]">Joylashuvni aniqlab bo&apos;lmadi — manzilni aniq yozing.</span>}
+                    {!geo && geoState !== "error" && <span className="mt-1 block text-xs text-[color:var(--s-muted)]">Kuryer tezroq topishi uchun (ixtiyoriy)</span>}
                   </label>
                 )}
                 <label className="block">

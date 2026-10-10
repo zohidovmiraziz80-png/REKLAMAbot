@@ -5,7 +5,9 @@ import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
 import { publicSiteUrls } from "@/lib/site/hosting";
 import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
-import { loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
+import { dispatchYandex, estimateYandex } from "@/lib/delivery/yandex-flow";
+import { YandexError } from "@/lib/delivery/yandex";
+import { hasYandex, loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
 import { tg } from "./api";
 import { withChatLink } from "./chat-link";
 import { botConfigSchema, buttonRows, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
@@ -108,9 +110,10 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
   const answer = (text: string) => tg(bot.token, "answerCallbackQuery", { callback_query_id: cb.id, text }).catch(() => undefined);
   const data = cb.data ?? "";
   const pay = data.match(/^pp:([0-9a-f-]{36})$/);
-  const m = pay ? null : data.match(/^os:([0-9a-f-]{36}):(\w+)$/);
+  const yd = data.match(/^y([dc]):([0-9a-f-]{36})$/);
+  const m = pay || yd ? null : data.match(/^os:([0-9a-f-]{36}):(\w+)$/);
   const chatId = cb.message?.chat.id;
-  if ((!m && !pay) || !chatId || !cb.message) return answer("");
+  if ((!m && !pay && !yd) || !chatId || !cb.message) return answer("");
 
   // Ruxsat: bot egasining chati yoki shu bot orqali ulangan do'kon guruhi
   let allowed = bot.owner_chat_id === chatId;
@@ -121,6 +124,32 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
   if (!allowed) return answer("Ruxsat yo'q");
 
   const who = [cb.from.first_name, cb.from.username ? `@${cb.from.username}` : ""].filter(Boolean).join(" ");
+
+  // Yandex kuryer: yd — narxni ko'rsatish, yc — tasdiqlab chaqirish
+  if (yd) {
+    if (!(await hasYandex(db, bot.workspace_id))) return answer("Yandex Delivery ulanmagan");
+    const orderId = yd[2];
+    const reply = (text: string, reply_markup?: unknown) =>
+      tg(bot.token, "sendMessage", { chat_id: chatId, text, reply_parameters: { message_id: cb.message!.message_id, allow_sending_without_reply: true }, ...(reply_markup ? { reply_markup } : {}) }).catch(() => undefined);
+    try {
+      if (yd[1] === "d") {
+        await answer("Narx hisoblanmoqda…");
+        const q = await estimateYandex(db, bot.workspace_id, orderId);
+        await reply(
+          `🚕 Yandex kuryer: taxminan ${formatMoney(q.price)}${q.distanceKm ? ` · ${q.distanceKm} km` : ""}${q.etaMinutes ? ` · ~${q.etaMinutes} daq` : ""}${q.approximate ? "\n⚠️ Manzil matndan topildi — mijoz bilan tekshirib oling." : ""}`,
+          { inline_keyboard: [[{ text: `✅ Chaqirish (${formatMoney(q.price)})`, callback_data: `yc:${orderId}` }]] },
+        );
+      } else {
+        await answer("Kuryer chaqirilmoqda…");
+        const r = await dispatchYandex(db, bot.workspace_id, orderId);
+        await tg(bot.token, "editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
+        await reply(`✅ Yandex kuryer chaqirildi${r.price ? ` — ${formatMoney(r.price)}` : ""}. Holat o'zgarsa buyurtmaga yoziladi, mijozga xabar boradi.`);
+      }
+    } catch (err) {
+      await reply(`❌ ${err instanceof YandexError ? err.message : "Xatolik. MIXBOT → Buyurtmalar sahifasidan urinib ko'ring."}`);
+    }
+    return;
+  }
 
   // "To'landi" tugmasi (masalan, kartaga o'tkazma kanalga tushmagan bo'lsa)
   if (pay) {
@@ -134,7 +163,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
       chat_id: chatId,
       message_id: cb.message.message_id,
       text: orderAdminText(fresh).slice(0, 4096),
-      reply_markup: orderAdminKeyboard(fresh, o.status),
+      reply_markup: orderAdminKeyboard(fresh, o.status, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)) }),
     }).catch(() => undefined);
     return;
   }
@@ -158,7 +187,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
     chat_id: chatId,
     message_id: cb.message.message_id,
     text: `${orderAdminText(o, current)}\n\n✏️ ${ORDER_STATUS_LABELS[current]} — ${who}`.slice(0, 4096),
-    reply_markup: orderAdminKeyboard(o, current),
+    reply_markup: orderAdminKeyboard(o, current, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)) }),
   }).catch(() => undefined);
 }
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getWorkspacePlan } from "@/lib/plans";
 import { decryptSecret } from "@/lib/crypto";
 import { formatUzPhone } from "@/lib/phone";
 import { tg } from "@/lib/telegram/api";
@@ -102,9 +103,10 @@ export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
   return lines.filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n").slice(0, 4000);
 }
 
-export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, status: OrderStatus) {
+export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, status: OrderStatus, opts: { yandex?: boolean } = {}) {
   if (status === "cancelled") return { inline_keyboard: [] };
-  const payRow = o.payment_status === "unpaid" ? [[{ text: "💳 To'landi deb belgilash", callback_data: `pp:${o.id}` }]] : [];
+  const payRow: { text: string; callback_data: string }[][] = o.payment_status === "unpaid" ? [[{ text: "💳 To'landi deb belgilash", callback_data: `pp:${o.id}` }]] : [];
+  if (opts.yandex && status !== "done") payRow.push([{ text: "🚕 Yandex kuryer", callback_data: `yd:${o.id}` }]);
   if (status === "done") return { inline_keyboard: payRow };
   const btn = (s: OrderStatus, text: string) => ({ text, callback_data: `os:${o.id}:${s}` });
   const rows: { text: string; callback_data: string }[][] =
@@ -114,6 +116,15 @@ export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, s
         ? [[btn("delivering", "🚚 Yo'lga chiqdi"), btn("done", "🎉 Yakunlash")], [btn("cancelled", "❌ Bekor qilish")]]
         : [[btn("done", "🎉 Yakunlash"), btn("cancelled", "❌ Bekor qilish")]];
   return { inline_keyboard: [...rows, ...payRow] };
+}
+
+/** Yandex Delivery ulangan va tarif ruxsat beradimi (buyurtma xabaridagi kuryer tugmasi uchun) */
+export async function hasYandex(db: SupabaseClient, workspaceId: string) {
+  const [{ data }, plan] = await Promise.all([
+    db.from("integrations").select("status").eq("workspace_id", workspaceId).eq("provider", "yandex").maybeSingle(),
+    getWorkspacePlan(db, workspaceId),
+  ]);
+  return data?.status === "active" && plan.integrations;
 }
 
 /** Yangi buyurtma: bot egasiga va ulangan guruhga xabar, mijozga tasdiq */
@@ -128,7 +139,8 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
       .maybeSingle();
 
     const text = orderAdminText(order);
-    const keyboard = orderAdminKeyboard(order, order.status);
+    const yandex = order.delivery_method === "courier" && (await hasYandex(db, order.workspace_id));
+    const keyboard = orderAdminKeyboard(order, order.status, { yandex });
     const sent = new Set<string>();
     const sendTo = async (bot: BotRow, chatId: number) => {
       const key = `${bot.project_id}:${chatId}`;
@@ -186,6 +198,18 @@ export async function notifyCustomerStatus(db: SupabaseClient, order: Pick<Order
     const bot = bots.find((b) => b.project_id === order.bot_project_id);
     if (!bot) return;
     await tg(bot.token, "sendMessage", { chat_id: order.chat_id, text: `🛒 Buyurtma №${order.number} ${CUSTOMER_STATUS_TEXT[status]}` });
+  } catch {
+    // mijoz botni bloklagan bo'lishi mumkin
+  }
+}
+
+/** Mijozga ixtiyoriy matn (masalan, kuryer ma'lumoti) */
+export async function notifyCustomerText(db: SupabaseClient, order: Pick<OrderRow, "workspace_id" | "chat_id" | "bot_project_id">, text: string) {
+  if (!order.chat_id || !order.bot_project_id) return;
+  try {
+    const bots = await loadBots(db, order.workspace_id);
+    const bot = bots.find((b) => b.project_id === order.bot_project_id);
+    if (bot) await tg(bot.token, "sendMessage", { chat_id: order.chat_id, text: text.slice(0, 4000) });
   } catch {
     // mijoz botni bloklagan bo'lishi mumkin
   }

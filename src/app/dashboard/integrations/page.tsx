@@ -14,7 +14,7 @@ const CARDS: Card[] = [
   { id: "payme", name: "Payme", emoji: "💳", group: "To'lov", text: "Saytda va bot ichida karta bilan to'lov", href: "/dashboard/integrations/payme" },
   { id: "click", name: "Click", emoji: "💳", group: "To'lov", text: "Click orqali onlayn to'lov", href: "/dashboard/integrations/click" },
   { id: "multicard", name: "Multicard", emoji: "💳", group: "To'lov", text: "Multicard orqali onlayn to'lov", href: "/dashboard/integrations/multicard" },
-  { id: "yandex", name: "Yandex Delivery", emoji: "🚕", group: "Yetkazish", text: "Buyurtmaga kuryer chaqirish, narxni hisoblash" },
+  { id: "yandex", name: "Yandex Delivery", emoji: "🚕", group: "Yetkazish", text: "Buyurtmaga kuryer chaqirish, narxni hisoblash", href: "/dashboard/integrations/yandex" },
   { id: "bts", name: "BTS", emoji: "📦", group: "Yetkazish", text: "Viloyatlarga pochta orqali yuborish" },
   { id: "fargo", name: "Fargo", emoji: "🚚", group: "Yetkazish", text: "Kuryer va pochta xizmati" },
   { id: "eskiz", name: "Eskiz SMS", emoji: "✉️", group: "Xabarnoma", text: "Mijozga buyurtma holati SMS bilan" },
