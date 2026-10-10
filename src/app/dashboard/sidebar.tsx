@@ -76,7 +76,7 @@ function groups(newOrders: number): Group[] {
         { label: "Sayt", icon: "site", href: "/dashboard/sites" },
         { label: "Telegram bot", icon: "telegram", href: "/dashboard/bots" },
         { label: "WhatsApp", icon: "whatsapp", href: "/dashboard/whatsapp", soon: true },
-        { label: "Chat", icon: "chat", href: "/dashboard/chat", soon: true },
+        { label: "Chat", icon: "chat", href: "/dashboard/chat" },
       ],
     },
     {

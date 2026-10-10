@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { handleOwnerReply, logIncoming } from "@/lib/chat";
 import { handleChannelPost, matchPaymentText } from "@/lib/payments/card";
 import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
@@ -28,6 +29,7 @@ type TgMessage = {
   /** Boshqa joydan forward qilingan xabar (masalan Click bot to'lov xabari) */
   forward_origin?: unknown;
   forward_date?: number;
+  reply_to_message?: { message_id: number };
 };
 type TgCallback = {
   id: string;
@@ -279,6 +281,20 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     return;
   }
 
+  // Ega mijoz xabariga Telegram'da reply qildi — javob mijozga boradi
+  if (bot.owner_chat_id === chatId && msg.reply_to_message && text && !text.startsWith("/")) {
+    const r = await handleOwnerReply(db, bot, msg.reply_to_message.message_id, text);
+    if (r === "sent") {
+      await send("✅ Javob mijozga yuborildi.");
+      return;
+    }
+    if (r === "failed") {
+      await send("❌ Yuborilmadi — mijoz botni bloklagan bo'lishi mumkin.");
+      return;
+    }
+  }
+  const who = `${name ?? "Mijoz"}${username ? ` (@${username})` : ""}`;
+
   // "Sayt" tarifi: bot faqat mijozni tasdiqlash va buyurtma xabarlari uchun
   const plan = await getWorkspacePlan(db, bot.workspace_id);
   const confirmOnly = !plan.botShop;
@@ -360,7 +376,12 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   }
 
   if (confirmOnly) {
-    await sendSiteLink("Buyurtma berish va holatini ko'rish uchun saytimizga o'ting 👇 Buyurtma xabarlari shu yerga keladi.");
+    const logged = text && !text.startsWith("/") ? await logIncoming(db, bot, chatId, who, text) : false;
+    await sendSiteLink(
+      logged
+        ? "✉️ Xabaringiz yetkazildi, tez orada javob beramiz. Buyurtma berish uchun saytimizga o'ting 👇"
+        : "Buyurtma berish va holatini ko'rish uchun saytimizga o'ting 👇 Buyurtma xabarlari shu yerga keladi.",
+    );
     return;
   }
 
@@ -483,5 +504,10 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     return;
   }
 
+  // Menyuda yo'q erkin matn — do'konga xabar sifatida saqlanadi (Chat bo'limi)
+  if (text && !text.startsWith("/") && (await logIncoming(db, bot, chatId, who, text))) {
+    await send("✉️ Xabaringiz yetkazildi, tez orada javob beramiz.", menu());
+    return;
+  }
   await send("Iltimos, quyidagi menyudan tanlang 👇", menu());
 }

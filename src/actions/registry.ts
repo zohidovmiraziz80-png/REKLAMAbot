@@ -1,6 +1,7 @@
 import type { ActionDefinition } from "./define";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, connectBts, getBtsSetup, saveBtsSettings, connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
 import { getMetrics } from "./metrics";
+import { getConversation, listConversations, sendChatReply } from "./chat";
 import { connectEskiz, getEskizSetup, sendTestSms } from "./sms";
 import { broadcastInfo, deletePromo, listPromos, savePromo, sendBroadcastChunk, sendBroadcastTest, setPromoActive } from "./marketing";
 import { addMember, changePassword, getSettings, removeMember, renameWorkspace, saveProfile, updateMemberRole } from "./settings";
@@ -119,6 +120,9 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   getEskizSetup,
   connectEskiz,
   sendTestSms,
+  listConversations,
+  getConversation,
+  sendChatReply,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,
