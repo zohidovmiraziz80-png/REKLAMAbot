@@ -20,9 +20,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     (async () => {
       const q = (cols: string) =>
         db.from("orders").select(cols).eq("workspace_id", site.workspaceId).eq("phone", s.p).order("created_at", { ascending: false }).limit(30);
-      const r = await q("id, number, status, payment_status, payment_method, pay_amount, total, items, delivery_method, created_at");
+      const r = await q("id, number, status, payment_status, payment_method, pay_amount, total, subtotal, delivery_price, discount, address, comment, items, delivery_method, created_at");
       // pay_amount ustuni hali bazada bo'lmasa
-      return r.error ? await q("id, number, status, payment_status, payment_method, total, items, delivery_method, created_at") : r;
+      return r.error ? await q("id, number, status, payment_status, payment_method, total, subtotal, delivery_price, address, comment, items, delivery_method, created_at") : r;
     })(),
   ]);
   return NextResponse.json({

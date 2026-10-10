@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
+import { CUSTOMER_STATUS_LABELS, PAY_METHOD_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 
 /**
  * Mijoz kabineti: Telegram bot orqali telefonni tasdiqlab kirish va buyurtmalar ro'yxati.
@@ -60,11 +60,39 @@ type Order = {
   payment_method: string;
   pay_amount: number | null;
   total: number;
+  subtotal?: number;
+  delivery_price?: number;
+  discount?: number;
+  address?: string | null;
+  comment?: string | null;
+  delivery_method?: string;
   items: { name: string; qty: number; price?: number; image_url?: string | null; emoji?: string }[];
   created_at: string;
 };
 
-const PAY_LABEL: Record<string, string> = { cash: "Naqd", card: "Kartaga o'tkazma", payme: "Payme", click: "Click", multicard: "Multicard" };
+const STEPS: { key: OrderStatus; label: string }[] = [
+  { key: "new", label: "Qabul qilindi" },
+  { key: "confirmed", label: "Do'kon qabul qildi" },
+  { key: "delivering", label: "Yo'lda" },
+  { key: "done", label: "Yetkazildi" },
+];
+
+function Progress({ status, pickup }: { status: OrderStatus; pickup: boolean }) {
+  if (status === "cancelled") return <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">❌ Buyurtma bekor qilindi</p>;
+  const idx = STEPS.findIndex((s) => s.key === status);
+  return (
+    <div className="flex items-start gap-1">
+      {STEPS.map((s, i) => (
+        <div key={s.key} className="flex flex-1 flex-col items-center gap-1 text-center">
+          <div className={`h-1.5 w-full rounded-full ${i <= idx ? "bg-[color:var(--s-accent)]" : "bg-[color:var(--s-line)]"}`} />
+          <span className={`text-[10px] leading-tight ${i === idx ? "font-semibold text-[color:var(--s-text)]" : "text-[color:var(--s-muted)]"}`}>
+            {pickup && s.key === "delivering" ? "Tayyor" : pickup && s.key === "done" ? "Olib ketildi" : s.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function dateOf(iso: string) {
   const d = new Date(new Date(iso).getTime() + 5 * 3600 * 1000);
@@ -289,11 +317,16 @@ function Cabinet({ slug, saved }: { slug: string; saved: Saved }) {
           {orders?.map((o) => (
             <li key={o.id} className="rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-line)] p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <b>№{o.number}</b>
+                <b>Buyurtma №{o.number}</b>
                 <span className="text-xs text-[color:var(--s-muted)]">{dateOf(o.created_at)}</span>
               </div>
-              <ul className="mt-2 space-y-1.5">
-                {(o.items ?? []).slice(0, 6).map((i, idx) => (
+              <p className="mt-1 text-sm font-medium">{CUSTOMER_STATUS_LABELS[o.status] ?? o.status}</p>
+              <div className="mt-2">
+                <Progress status={o.status} pickup={o.delivery_method === "pickup"} />
+              </div>
+
+              <ul className="mt-3 space-y-1.5">
+                {(o.items ?? []).slice(0, 8).map((i, idx) => (
                   <li key={idx} className="flex items-center gap-2.5">
                     {i.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -301,23 +334,67 @@ function Cabinet({ slug, saved }: { slug: string; saved: Saved }) {
                     ) : (
                       <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--s-surface)] text-lg">{i.emoji || "📦"}</span>
                     )}
-                    <span className="min-w-0 flex-1 truncate">{i.name}</span>
-                    <span className="shrink-0 text-xs text-[color:var(--s-muted)]">× {i.qty}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{i.name}</span>
+                      {i.price != null && (
+                        <span className="text-xs text-[color:var(--s-muted)]">
+                          {i.qty} × {formatMoney(i.price)}
+                        </span>
+                      )}
+                    </span>
+                    {i.price != null && <span className="shrink-0 text-xs font-medium">{formatMoney(i.price * i.qty)}</span>}
                   </li>
                 ))}
-                {(o.items ?? []).length > 6 && <li className="text-xs text-[color:var(--s-muted)]">yana {(o.items ?? []).length - 6} ta…</li>}
+                {(o.items ?? []).length > 8 && <li className="text-xs text-[color:var(--s-muted)]">yana {(o.items ?? []).length - 8} ta…</li>}
               </ul>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-[color:var(--s-surface)] px-2 py-0.5 text-xs font-medium">{ORDER_STATUS_LABELS[o.status] ?? o.status}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${o.payment_status === "paid" ? "bg-emerald-100 text-emerald-800" : o.payment_status === "refunded" ? "bg-gray-100 text-gray-700" : "bg-amber-100 text-amber-800"}`}
-                >
-                  {o.payment_status === "paid" ? "✅ To'langan" : o.payment_status === "refunded" ? "Qaytarilgan" : "⏳ To'lanmagan"} · {PAY_LABEL[o.payment_method] ?? o.payment_method}
-                </span>
-                <span className="ml-auto font-semibold">{formatMoney(o.total)}</span>
-              </div>
+
+              <dl className="mt-3 space-y-1 border-t border-[color:var(--s-line)] pt-2 text-xs">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[color:var(--s-muted)]">Qabul qilish</dt>
+                  <dd className="text-right">{o.delivery_method === "courier" ? `🚚 Yetkazib berish${o.address ? `: ${o.address}` : ""}` : "🏪 Olib ketish"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[color:var(--s-muted)]">To&apos;lov</dt>
+                  <dd className="text-right">
+                    {PAY_METHOD_LABELS[o.payment_method] ?? o.payment_method} ·{" "}
+                    <span className={o.payment_status === "paid" ? "text-emerald-700" : o.payment_status === "refunded" ? "" : "text-amber-700"}>
+                      {o.payment_status === "paid" ? "✅ to'langan" : o.payment_status === "refunded" ? "qaytarilgan" : "⏳ to'lanmagan"}
+                    </span>
+                  </dd>
+                </div>
+                {o.comment && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-[color:var(--s-muted)]">Izoh</dt>
+                    <dd className="text-right">{o.comment}</dd>
+                  </div>
+                )}
+                {o.subtotal != null && (o.delivery_price || o.discount) ? (
+                  <>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[color:var(--s-muted)]">Mahsulotlar</dt>
+                      <dd>{formatMoney(o.subtotal)}</dd>
+                    </div>
+                    {!!o.delivery_price && (
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[color:var(--s-muted)]">Yetkazish</dt>
+                        <dd>{formatMoney(o.delivery_price)}</dd>
+                      </div>
+                    )}
+                    {!!o.discount && (
+                      <div className="flex justify-between gap-3 text-emerald-700">
+                        <dt>Chegirma</dt>
+                        <dd>−{formatMoney(o.discount)}</dd>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+                <div className="flex justify-between gap-3 pt-1 text-sm font-bold">
+                  <dt>Jami</dt>
+                  <dd>{formatMoney(o.total)}</dd>
+                </div>
+              </dl>
               {o.payment_method === "card" && o.payment_status === "unpaid" && o.pay_amount && o.status !== "cancelled" && (
-                <p className="mt-2 text-xs text-[color:var(--s-muted)]">O&apos;tkazish kerak: aynan {formatMoney(o.pay_amount)}</p>
+                <p className="mt-2 rounded-lg bg-[color:var(--s-surface)] px-2 py-1.5 text-xs">💳 O&apos;tkazish kerak: aynan {formatMoney(o.pay_amount)}</p>
               )}
             </li>
           ))}

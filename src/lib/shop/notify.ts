@@ -133,7 +133,7 @@ export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, s
   const btn = (s: OrderStatus, text: string) => ({ text, callback_data: `os:${o.id}:${s}` });
   const rows: { text: string; callback_data: string }[][] =
     status === "new"
-      ? [[btn("confirmed", "✅ Tasdiqlash"), btn("cancelled", "❌ Bekor qilish")]]
+      ? [[btn("confirmed", "✅ Qabul qilish"), btn("cancelled", "❌ Bekor qilish")]]
       : status === "confirmed"
         ? [[btn("delivering", "🚚 Yo'lga chiqdi"), btn("done", "🎉 Yakunlash")], [btn("cancelled", "❌ Bekor qilish")]]
         : [[btn("done", "🎉 Yakunlash"), btn("cancelled", "❌ Bekor qilish")]];
@@ -204,7 +204,7 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
         try {
           await tg(cb.token, "sendMessage", {
             chat_id: order.chat_id,
-            text: `✅ Buyurtmangiz qabul qilindi!\n\n🛒 №${order.number}\n${items}\n💰 Jami: ${formatMoney(order.total)}\n\n${customerExtra ? `${customerExtra}\n\n` : ""}${thanks || "Tez orada siz bilan bog'lanamiz."}`.slice(0, 4000),
+            text: `📨 Buyurtmangiz yuborildi! Do'kon tez orada qabul qiladi.\n\n🛒 №${order.number}\n${items}\n💰 Jami: ${formatMoney(order.total)}\n\n${customerExtra ? `${customerExtra}\n\n` : ""}${thanks || "Tez orada siz bilan bog'lanamiz."}`.slice(0, 4000),
           });
         } catch {
           // mijoz botni bloklagan bo'lishi mumkin
@@ -218,7 +218,7 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
 
 const CUSTOMER_STATUS_TEXT: Record<OrderStatus, string> = {
   new: "qabul qilindi",
-  confirmed: "tasdiqlandi ✅",
+  confirmed: "do'kon tomonidan qabul qilindi ✅ Tayyorlanmoqda",
   delivering: "yo'lga chiqdi 🚚",
   done: "yakunlandi 🎉 Xaridingiz uchun rahmat!",
   cancelled: "bekor qilindi ❌",

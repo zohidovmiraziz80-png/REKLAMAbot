@@ -20,7 +20,7 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   new: "Yangi",
-  confirmed: "Tasdiqlandi",
+  confirmed: "Qabul qilindi",
   delivering: "Yetkazilmoqda",
   done: "Yakunlandi",
   cancelled: "Bekor qilindi",
@@ -33,6 +33,17 @@ export const ORDER_STATUS_EMOJI: Record<OrderStatus, string> = {
   done: "🎉",
   cancelled: "❌",
 };
+
+/** Mijozga ko'rinadigan holat nomlari */
+export const CUSTOMER_STATUS_LABELS: Record<OrderStatus, string> = {
+  new: "⏳ Qabul qilinishi kutilmoqda",
+  confirmed: "✅ Do'kon qabul qildi",
+  delivering: "🚚 Yo'lda",
+  done: "🎉 Yetkazildi",
+  cancelled: "❌ Bekor qilindi",
+};
+
+export const PAY_METHOD_LABELS: Record<string, string> = { cash: "Naqd (qabul qilganda)", card: "Kartaga o'tkazma", payme: "Payme", click: "Click", multicard: "Multicard" };
 
 export const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];

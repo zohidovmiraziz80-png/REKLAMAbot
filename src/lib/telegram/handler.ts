@@ -6,7 +6,7 @@ import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
 import { publicSiteUrls } from "@/lib/site/hosting";
-import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
+import { CUSTOMER_STATUS_LABELS, ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, PAY_METHOD_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 import { dispatchYandex, estimateYandex } from "@/lib/delivery/yandex-flow";
 import { YandexError } from "@/lib/delivery/yandex";
 import { hasCouriers, hasYandex, loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
@@ -532,7 +532,7 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       const [{ data: orders }, { data: requests }] = await Promise.all([
         db
           .from("orders")
-          .select("number, status, total, items, created_at")
+          .select("number, status, total, items, created_at, delivery_method, address, payment_method, payment_status")
           .eq("workspace_id", bot.workspace_id)
           .eq("chat_id", chatId)
           .order("created_at", { ascending: false })
@@ -563,10 +563,18 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       for (const o of [...(orders ?? [])].reverse()) {
         const st = o.status as OrderStatus;
         const items = (o.items as Item[]) ?? [];
-        const caption = `🛒 №${o.number} · ${dateOf(o.created_at as string)} · ${ORDER_STATUS_EMOJI[st]} ${ORDER_STATUS_LABELS[st]}\n${items
-          .slice(0, 10)
-          .map((i) => `• ${i.name} × ${i.qty}`)
-          .join("\n")}\n💰 ${formatMoney(o.total as number)}`.slice(0, 1000);
+        const caption = [
+          `🛒 Buyurtma №${o.number} · ${dateOf(o.created_at as string)}`,
+          `Holat: ${CUSTOMER_STATUS_LABELS[st] ?? st}`,
+          "",
+          ...items.slice(0, 10).map((i) => `• ${i.name} × ${i.qty}`),
+          "",
+          o.delivery_method === "courier" ? `🚚 Yetkazib berish${o.address ? `: ${o.address}` : ""}` : "🏪 Olib ketish",
+          `💳 ${PAY_METHOD_LABELS[o.payment_method as string] ?? o.payment_method} · ${o.payment_status === "paid" ? "to'langan ✅" : o.payment_status === "refunded" ? "qaytarilgan" : "to'lanmagan"}`,
+          `💰 Jami: ${formatMoney(o.total as number)}`,
+        ]
+          .join("\n")
+          .slice(0, 1000);
         const photos = items.map((i) => i.image_url).filter((u): u is string => !!u && /^https:\/\//.test(u)).slice(0, 10);
         try {
           if (photos.length > 1) {
