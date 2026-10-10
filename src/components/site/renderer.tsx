@@ -71,7 +71,7 @@ function anchorFor(block: Block, firstOfType: boolean) {
 function BlockView({ block, basePath, anchor, shop }: { block: Block; basePath: string; anchor: string; shop?: ShopData }) {
   switch (block.type) {
     case "shop":
-      return shop ? (
+      return shop && (shop.products.length > 0 || !shop.embedded) ? (
         <ShopSection shop={shop} heading={block.heading} subheading={block.subheading} anchor={anchor} />
       ) : (
         <ShopPlaceholder heading={block.heading} subheading={block.subheading} anchor={anchor} />
@@ -271,9 +271,12 @@ export function SiteRenderer({
   shop?: ShopData;
 }) {
   const seen = new Set<string>();
-  // Saytda "Do'kon" bloki bo'lmasa, mahsulotlar bor bo'lsa ham bosh sahifada katalog avtomatik chiqadi
+  // Jonli mahsulotlar bo'lsa-yu saytda "Do'kon" bloki bo'lmasa: eski qo'lda yozilgan "Mahsulotlar" bloki
+  // o'rniga jonli katalog chiqadi; u ham bo'lmasa — bosh sahifada birinchi blokdan keyin.
   const hasShopBlock = site.pages.some((p) => p.blocks.some((b) => b.type === "shop"));
-  const autoShop = !!shop && shop.products.length > 0 && !hasShopBlock && page.slug === "home";
+  const live = !!shop && shop.products.length > 0 && !hasShopBlock;
+  const legacyId = live ? site.pages.flatMap((p) => p.blocks).find((b) => b.type === "products")?.id : undefined;
+  const autoShop = live && !legacyId && page.slug === "home";
   const contact = site.pages.flatMap((p) => p.blocks).find((b) => b.type === "contact");
   const contactHref = contact ? (page.blocks.includes(contact) ? "#aloqa" : `${basePath}/${site.pages.find((p) => p.blocks.includes(contact))?.slug}#aloqa`) : undefined;
 
@@ -310,7 +313,11 @@ export function SiteRenderer({
           seen.add(block.type);
           return (
             <Fragment key={block.id}>
-              <BlockView block={block} basePath={basePath} anchor={anchorFor(block, first)} shop={shop} />
+              {block.id === legacyId && block.type === "products" ? (
+                <ShopSection shop={shop!} heading={block.heading} subheading={block.subheading} anchor={anchorFor(block, first)} />
+              ) : (
+                <BlockView block={block} basePath={basePath} anchor={anchorFor(block, first)} shop={shop} />
+              )}
               {autoShop && i === 0 && <ShopSection shop={shop!} heading="Katalog" subheading="" anchor="katalog" />}
             </Fragment>
           );

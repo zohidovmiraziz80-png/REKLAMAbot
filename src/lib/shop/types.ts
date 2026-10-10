@@ -27,6 +27,8 @@ export type ShopData = {
   slug: string;
   /** Ko'rib chiqish rejimi — buyurtma yuborilmaydi */
   preview: boolean;
+  /** Tahrirlovchi ichida — savat oynasi va suzuvchi tugma ko'rsatilmaydi */
+  embedded?: boolean;
   products: PublicProduct[];
   settings: PublicShopSettings;
 };

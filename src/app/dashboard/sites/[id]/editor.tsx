@@ -13,6 +13,7 @@ import {
   type Site,
 } from "@/lib/site/schema";
 import type { PublishStatus } from "@/actions/publishing";
+import type { ShopData } from "@/lib/shop/types";
 import { editWebsiteWithAIAction, saveWebsiteAction } from "./actions";
 import { PublishPanel } from "./publish-panel";
 
@@ -278,12 +279,14 @@ export function SiteEditor({
   initialVersion,
   aiEnabled,
   publishStatus,
+  shop,
 }: {
   projectId: string;
   initialSite: Site;
   initialVersion: number;
   aiEnabled: boolean;
   publishStatus: PublishStatus;
+  shop?: ShopData | null;
 }) {
   const [site, setSite] = useState<Site>(initialSite);
   const [version, setVersion] = useState(initialVersion);
@@ -389,7 +392,7 @@ export function SiteEditor({
           if ((e.target as HTMLElement).closest("a")) e.preventDefault();
         }}
       >
-        <SiteRenderer site={site} page={page} />
+        <SiteRenderer site={site} page={page} shop={shop ?? undefined} />
       </div>
     ),
     [site, page],

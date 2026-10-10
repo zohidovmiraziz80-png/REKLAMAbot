@@ -5,6 +5,9 @@ import { runAction } from "@/actions/run";
 import { getWebsite } from "@/actions/websites";
 import { getPublishStatus } from "@/actions/publishing";
 import { isAiEnabled } from "@/lib/ai/config";
+import { loadShopData } from "@/lib/shop/public";
+import type { ShopData } from "@/lib/shop/types";
+import { createClient } from "@/lib/supabase/server";
 import { GenerateForm } from "./generate-form";
 import { SiteEditor } from "./editor";
 import { TemplatePicker } from "./template-picker";
@@ -35,6 +38,15 @@ export default async function SiteEditorPage({
   const aiEnabled = isAiEnabled();
   const publish = website.content ? await runAction(getPublishStatus, { projectId: id }) : null;
 
+  // Tahrirlovchida haqiqiy mahsulotlar ko'rinsin
+  let shop: ShopData | null = null;
+  if (website.content) {
+    const supabase = await createClient();
+    const { data: project } = await supabase.from("projects").select("workspace_id").eq("id", id).maybeSingle();
+    const data = project ? await loadShopData(project.workspace_id as string, "preview", { preview: true }) : null;
+    shop = data ? { ...data, embedded: true } : null;
+  }
+
   return (
     <div className="mx-auto max-w-[1400px]">
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
@@ -54,6 +66,7 @@ export default async function SiteEditorPage({
           initialSite={website.content}
           initialVersion={website.version}
           aiEnabled={aiEnabled}
+          shop={shop}
         />
       ) : aiEnabled && mode === "ai" ? (
         <GenerateForm projectId={website.projectId} defaultName={website.projectName} />

@@ -68,32 +68,52 @@ function saveCart(slug: string, cart: Cart) {
 const btnAccent = "rounded-[var(--s-radius)] bg-[color:var(--s-accent)] font-semibold text-white transition hover:brightness-110 disabled:opacity-50";
 const input =
   "w-full rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-3 py-2.5 text-[color:var(--s-text)] outline-none focus:border-[color:var(--s-accent)]";
+/** Rasm yo'q mahsulot uchun yumshoq fon (aksent rangidan) */
+const tint = { background: "color-mix(in srgb, var(--s-accent) 9%, var(--s-bg))" } as const;
 
-function ProductImage({ p, className }: { p: Pick<PublicProduct, "imageUrl" | "emoji" | "name">; className: string }) {
+function discount(p: Pick<PublicProduct, "price" | "oldPrice">) {
+  return p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
+}
+
+function ProductImage({ p, className, big = false }: { p: Pick<PublicProduct, "imageUrl" | "emoji" | "name">; className: string; big?: boolean }) {
   if (p.imageUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={p.imageUrl} alt={p.name} loading="lazy" className={`${className} object-cover`} />;
   }
-  return <div className={`${className} grid place-items-center bg-[color:var(--s-surface)] text-5xl`}>{p.emoji || "📦"}</div>;
+  return (
+    <div className={`${className} grid place-items-center`} style={tint}>
+      {p.emoji ? (
+        <span className={big ? "text-8xl" : "text-5xl sm:text-6xl"}>{p.emoji}</span>
+      ) : (
+        <span className={`font-extrabold text-[color:var(--s-accent)] opacity-60 ${big ? "text-8xl" : "text-5xl"}`}>{p.name.trim().charAt(0).toUpperCase() || "•"}</span>
+      )}
+    </div>
+  );
 }
 
-function Stepper({ qty, max, onChange }: { qty: number; max: number; onChange: (q: number) => void }) {
+function Stepper({ qty, max, onChange, size = "md" }: { qty: number; max: number; onChange: (q: number) => void; size?: "md" | "lg" }) {
+  const pad = size === "lg" ? "px-4 py-2.5 text-xl" : "px-3 py-1.5 text-lg";
   return (
-    <div className="flex items-center overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)]">
-      <button type="button" aria-label="Kamaytirish" onClick={() => onChange(qty - 1)} className="px-3 py-1.5 text-lg font-bold">
+    <div className="flex items-center justify-between overflow-hidden rounded-[var(--s-radius)] font-bold text-[color:var(--s-accent)]" style={tint}>
+      <button type="button" aria-label="Kamaytirish" onClick={() => onChange(qty - 1)} className={pad}>
         −
       </button>
-      <span className="min-w-8 text-center font-semibold">{qty}</span>
-      <button
-        type="button"
-        aria-label="Ko'paytirish"
-        disabled={qty >= max}
-        onClick={() => onChange(qty + 1)}
-        className="px-3 py-1.5 text-lg font-bold disabled:opacity-30"
-      >
+      <span className="min-w-8 text-center text-[color:var(--s-text)]">{qty}</span>
+      <button type="button" aria-label="Ko'paytirish" disabled={qty >= max} onClick={() => onChange(qty + 1)} className={`${pad} disabled:opacity-30`}>
         +
       </button>
     </div>
+  );
+}
+
+function AddControl({ p, qty, canOrder, onChange }: { p: PublicProduct; qty: number; canOrder: boolean; onChange: (q: number) => void }) {
+  if (!p.inStock) return <p className="py-2 text-center text-sm text-[color:var(--s-muted)]">Tugagan</p>;
+  if (!canOrder) return null;
+  if (qty > 0) return <Stepper qty={qty} max={p.maxQty} onChange={onChange} />;
+  return (
+    <button type="button" onClick={() => onChange(1)} className={`${btnAccent} w-full py-2 text-sm`}>
+      + Savatga
+    </button>
   );
 }
 
@@ -101,6 +121,8 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
   const { products, settings } = shop;
   const [cart, setCart] = useState<Cart>({});
   const [category, setCategory] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
 
@@ -108,6 +130,7 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
   const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))], [products]);
 
   useEffect(() => {
+    if (shop.embedded) return;
     telegramLink();
     const stored = loadCart(shop.slug);
     const clean: Cart = {};
@@ -116,14 +139,14 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
       if (p && p.inStock && Number.isInteger(q) && q > 0) clean[id] = Math.min(q, p.maxQty);
     }
     setCart(clean);
-  }, [shop.slug, byId]);
+  }, [shop.slug, shop.embedded, byId]);
 
   function update(id: string, qty: number) {
     setCart((c) => {
       const next = { ...c };
       if (qty <= 0) delete next[id];
       else next[id] = Math.min(qty, byId.get(id)?.maxQty ?? 99);
-      saveCart(shop.slug, next);
+      if (!shop.embedded) saveCart(shop.slug, next);
       return next;
     });
     webApp()?.HapticFeedback?.impactOccurred("light");
@@ -134,7 +157,9 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
     .filter((l): l is { p: PublicProduct; qty: number } => !!l.p);
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const subtotal = lines.reduce((s, l) => s + l.p.price * l.qty, 0);
-  const visible = category ? products.filter((p) => p.category === category) : products;
+  const q = query.trim().toLowerCase();
+  const visible = products.filter((p) => (!category || p.category === category) && (!q || p.name.toLowerCase().includes(q)));
+  const showTools = categories.length > 1 || products.length >= 6;
 
   function onTelegramLoad() {
     const w = webApp();
@@ -149,97 +174,159 @@ export function ShopSection({ shop, heading, subheading, anchor }: { shop: ShopD
   }
 
   return (
-    <section id={anchor} className="bg-[color:var(--s-surface)] py-14 sm:py-20">
-      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={onTelegramLoad} />
-      <div className="mx-auto w-full max-w-5xl px-5">
-        {heading && <h2 className="text-center text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
-        {subheading && <p className="mx-auto mt-3 max-w-2xl text-center text-[color:var(--s-muted)]">{subheading}</p>}
+    <section id={anchor} className="scroll-mt-16 py-12 sm:py-16">
+      {!shop.embedded && <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={onTelegramLoad} />}
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-5">
+        {(heading || subheading) && (
+          <div className="text-center">
+            {heading && <h2 className="text-2xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-3xl">{heading}</h2>}
+            {subheading && <p className="mx-auto mt-2 max-w-2xl text-[color:var(--s-muted)]">{subheading}</p>}
+          </div>
+        )}
 
         {!settings.acceptOrders && (
-          <p className="mx-auto mt-6 max-w-md rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] px-4 py-3 text-center text-sm">
+          <p className="mx-auto mt-6 max-w-md rounded-[var(--s-radius)] border border-[color:var(--s-line)] px-4 py-3 text-center text-sm">
             Hozircha onlayn buyurtma qabul qilinmayapti.
           </p>
         )}
 
-        {categories.length > 1 && (
-          <div className="mt-8 flex gap-2 overflow-x-auto pb-1">
-            {["", ...categories].map((c) => (
-              <button
-                key={c || "all"}
-                type="button"
-                onClick={() => setCategory(c)}
-                className={`rounded-full border px-4 py-1.5 text-sm whitespace-nowrap ${
-                  category === c
-                    ? "border-[color:var(--s-accent)] bg-[color:var(--s-accent)] font-semibold text-white"
-                    : "border-[color:var(--s-line)] bg-[color:var(--s-bg)]"
-                }`}
-              >
-                {c || "Hammasi"}
-              </button>
-            ))}
+        {showTools && (
+          <div className="sticky top-16 z-[5] -mx-4 mt-6 space-y-2 bg-[color:var(--s-bg)]/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
+            {products.length >= 6 && (
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 Qidirish…" className={`${input} py-2`} />
+            )}
+            {categories.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                {["", ...categories].map((c) => (
+                  <button
+                    key={c || "all"}
+                    type="button"
+                    onClick={() => setCategory(c)}
+                    className={`rounded-full px-4 py-1.5 text-sm whitespace-nowrap transition ${
+                      category === c ? "bg-[color:var(--s-accent)] font-semibold text-white" : "border border-[color:var(--s-line)]"
+                    }`}
+                  >
+                    {c || "Hammasi"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {products.length === 0 ? (
           <p className="mt-10 text-center text-[color:var(--s-muted)]">Mahsulotlar tez orada qo&apos;shiladi.</p>
+        ) : visible.length === 0 ? (
+          <p className="mt-10 text-center text-[color:var(--s-muted)]">Hech narsa topilmadi</p>
         ) : (
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          <div className={`mt-6 grid gap-3 sm:gap-5 ${visible.length === 1 ? "mx-auto max-w-xs grid-cols-1" : visible.length === 2 ? "mx-auto max-w-xl grid-cols-2" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"}`}>
             {visible.map((p) => {
-              const qty = cart[p.id] ?? 0;
+              const off = discount(p);
               return (
-                <div key={p.id} className="flex flex-col overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)]">
-                  <div className="relative">
-                    <ProductImage p={p} className="aspect-square w-full" />
-                    {p.oldPrice && p.oldPrice > p.price && (
-                      <span className="absolute top-2 left-2 rounded-full bg-[color:var(--s-accent)] px-2 py-0.5 text-xs font-bold text-white">
-                        −{Math.round((1 - p.price / p.oldPrice) * 100)}%
-                      </span>
+                <article
+                  key={p.id}
+                  className="group flex flex-col overflow-hidden rounded-[var(--s-radius)] border border-[color:var(--s-line)] bg-[color:var(--s-bg)] transition hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  <button type="button" onClick={() => setDetail(p)} className="relative block text-left" aria-label={p.name}>
+                    <ProductImage p={p} className={`aspect-square w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
+                    {off > 0 && (
+                      <span className="absolute top-2 left-2 rounded-full bg-[color:var(--s-accent)] px-2 py-0.5 text-xs font-bold text-white">−{off}%</span>
                     )}
-                  </div>
-                  <div className="flex flex-1 flex-col p-3 sm:p-4">
-                    <h3 className="font-semibold leading-snug">{p.name}</h3>
-                    {p.description && <p className="mt-1 line-clamp-2 text-sm text-[color:var(--s-muted)]">{p.description}</p>}
-                    <div className="mt-auto pt-3">
-                      <p className="font-bold text-[color:var(--s-heading)]">
-                        {formatMoney(p.price)}
-                        {p.oldPrice && p.oldPrice > p.price && (
-                          <span className="ml-2 text-sm font-normal text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>
-                        )}
+                    {!p.inStock && (
+                      <span className="absolute inset-x-2 bottom-2 rounded-full bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">Tugagan</span>
+                    )}
+                  </button>
+                  <div className="flex flex-1 flex-col p-3">
+                    <button type="button" onClick={() => setDetail(p)} className="text-left">
+                      <h3 className="line-clamp-2 text-[15px] leading-snug font-semibold">{p.name}</h3>
+                    </button>
+                    <div className="mt-auto pt-2">
+                      <p className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-base font-extrabold text-[color:var(--s-heading)] sm:text-lg">{formatMoney(p.price)}</span>
+                        {off > 0 && <span className="text-xs text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>}
                       </p>
                       <div className="mt-2">
-                        {!p.inStock ? (
-                          <p className="py-2 text-center text-sm text-[color:var(--s-muted)]">Tugagan</p>
-                        ) : !settings.acceptOrders ? null : qty > 0 ? (
-                          <Stepper qty={qty} max={p.maxQty} onChange={(q) => update(p.id, q)} />
-                        ) : (
-                          <button type="button" onClick={() => update(p.id, 1)} className={`${btnAccent} w-full py-2 text-sm`}>
-                            Savatga
-                          </button>
-                        )}
+                        <AddControl p={p} qty={cart[p.id] ?? 0} canOrder={settings.acceptOrders} onChange={(q2) => update(p.id, q2)} />
                       </div>
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
       </div>
 
-      {count > 0 && open === null && (
-        <div className="fixed inset-x-0 bottom-0 z-40 p-3">
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setDetail(null)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
+          >
+            <div className="relative">
+              <ProductImage p={detail} big className="aspect-square w-full" />
+              <button
+                type="button"
+                onClick={() => setDetail(null)}
+                aria-label="Yopish"
+                className="absolute top-3 right-3 grid size-9 place-items-center rounded-full bg-black/50 text-xl text-white"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3 p-5">
+              {detail.category && <p className="text-xs font-semibold tracking-wide text-[color:var(--s-accent)] uppercase">{detail.category}</p>}
+              <h3 className="text-xl font-bold">{detail.name}</h3>
+              <p className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold text-[color:var(--s-heading)]">{formatMoney(detail.price)}</span>
+                {discount(detail) > 0 && <span className="text-[color:var(--s-muted)] line-through">{formatMoney(detail.oldPrice)}</span>}
+              </p>
+              {detail.description && <p className="whitespace-pre-line text-[color:var(--s-muted)]">{detail.description}</p>}
+              <div className="pt-2">
+                {!detail.inStock ? (
+                  <p className="rounded-[var(--s-radius)] border border-[color:var(--s-line)] py-3 text-center text-[color:var(--s-muted)]">Hozircha tugagan</p>
+                ) : !settings.acceptOrders ? null : (cart[detail.id] ?? 0) > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Stepper size="lg" qty={cart[detail.id]} max={detail.maxQty} onChange={(q2) => update(detail.id, q2)} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDetail(null);
+                        if (!shop.embedded) setOpen("cart");
+                      }}
+                      className={`${btnAccent} py-3`}
+                    >
+                      Savatga o&apos;tish
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => update(detail.id, 1)} className={`${btnAccent} w-full py-3`}>
+                    + Savatga qo&apos;shish
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {count > 0 && open === null && !detail && !shop.embedded && (
+        <div className="fixed inset-x-0 bottom-0 z-40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={() => setOpen("cart")}
-            className={`${btnAccent} mx-auto flex w-full max-w-lg items-center justify-between px-5 py-3.5 shadow-lg`}
+            className={`${btnAccent} mx-auto flex w-full max-w-lg items-center justify-between px-5 py-3.5 shadow-xl`}
           >
-            <span>🛒 Savat · {count} ta</span>
-            <span>{formatMoney(subtotal)} →</span>
+            <span className="flex items-center gap-2">
+              <span className="grid size-7 place-items-center rounded-full bg-white/25 text-sm">{count}</span>
+              Savatni ko&apos;rish
+            </span>
+            <span>{formatMoney(subtotal)}</span>
           </button>
         </div>
       )}
 
-      {open && (
+      {open && !shop.embedded && (
         <CartDrawer
           shop={shop}
           lines={lines}
