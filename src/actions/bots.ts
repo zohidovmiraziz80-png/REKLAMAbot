@@ -163,6 +163,8 @@ export const connectBot = defineAction({
       // bunday holatda Vercel'ning doimiy IP manzilini to'g'ridan-to'g'ri beramiz.
       const dnsIssue = err instanceof TelegramError && /resolve host|bad webhook/i.test(err.message);
       if (!dnsIssue) telegramError(err);
+      // Telegram setWebhook'ni soniyasiga 1 martadan ko'p qabul qilmaydi
+      await new Promise((r) => setTimeout(r, 1500));
       try {
         await tg(input.token, "setWebhook", { ...webhook, ip_address: VERCEL_EDGE_IP });
       } catch (err2) {

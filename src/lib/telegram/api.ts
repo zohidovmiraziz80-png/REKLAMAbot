@@ -6,12 +6,28 @@ export class TelegramError extends Error {
   constructor(
     public status: number,
     message: string,
+    public retryAfter?: number,
   ) {
     super(message);
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** "Too Many Requests: retry after N" bo'lsa, ko'rsatilgan vaqt kutib bir marta qayta urinadi */
 export async function tg<T = unknown>(token: string, method: string, body: Record<string, unknown> = {}): Promise<T> {
+  try {
+    return await tgOnce<T>(token, method, body);
+  } catch (err) {
+    if (err instanceof TelegramError && err.status === 429 && err.retryAfter !== undefined && err.retryAfter <= 5) {
+      await sleep((err.retryAfter + 0.5) * 1000);
+      return tgOnce<T>(token, method, body);
+    }
+    throw err;
+  }
+}
+
+async function tgOnce<T>(token: string, method: string, body: Record<string, unknown>): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
@@ -24,8 +40,16 @@ export async function tg<T = unknown>(token: string, method: string, body: Recor
   } catch {
     throw new TelegramError(0, "Telegram'ga ulanib bo'lmadi");
   }
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: T; error_code?: number; description?: string };
-  if (!data.ok) throw new TelegramError(data.error_code ?? res.status, data.description ?? "Telegram xatosi");
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    result?: T;
+    error_code?: number;
+    description?: string;
+    parameters?: { retry_after?: number };
+  };
+  if (!data.ok) {
+    throw new TelegramError(data.error_code ?? res.status, data.description ?? "Telegram xatosi", data.parameters?.retry_after);
+  }
   return data.result as T;
 }
 
