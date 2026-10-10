@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { runAction } from "@/actions/run";
-import { broadcastInfo, channelInfo, listPromos } from "@/actions/marketing";
+import { broadcastInfo, channelInfo, getAbandonSettings, listPromos } from "@/actions/marketing";
+import { Abandoned } from "./abandoned";
 import { ChannelPost } from "./channel";
 import { Broadcast } from "./broadcast";
 import { Promos } from "./promos";
@@ -11,7 +12,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export default async function MarketingPage() {
-  const [bots, promos, channel] = await Promise.all([runAction(broadcastInfo, {}), runAction(listPromos, {}), runAction(channelInfo, {})]);
+  const [bots, promos, channel, abandon] = await Promise.all([
+    runAction(broadcastInfo, {}),
+    runAction(listPromos, {}),
+    runAction(channelInfo, {}),
+    runAction(getAbandonSettings, {}),
+  ]);
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
@@ -20,6 +26,7 @@ export default async function MarketingPage() {
       </div>
       {channel.ok && <ChannelPost info={channel.data} />}
       <Broadcast bots={bots.ok ? bots.data : []} />
+      {abandon.ok && <Abandoned initial={abandon.data} />}
       <Promos ready={promos.ok && promos.data.ready} promos={promos.ok ? promos.data.promos : []} />
     </div>
   );

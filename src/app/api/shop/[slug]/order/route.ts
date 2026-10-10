@@ -8,6 +8,7 @@ import { loadPayConfigs } from "@/lib/payments/config";
 import { verifySession } from "@/lib/shop/customer-session";
 import { formatMoney } from "@/lib/shop/format";
 import { evaluatePromo } from "@/lib/shop/promo";
+import { storeCart } from "@/lib/shop/identify";
 import { clickCheckoutUrl, multicardCheckoutUrl, paymeCheckoutUrl } from "@/lib/payments/core";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { normalizeUzPhone } from "@/lib/phone";
@@ -185,6 +186,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const result = created as { id: string; number: number; total: number };
+  // Buyurtma berildi — saqlangan savat eslatmasi kerak emas
+  if (tgUser && botProjectId) await storeCart(db, botProjectId, tgUser.id, null).catch(() => undefined);
 
   // Promo-kod: chegirma mahsulotlar summasidan hisoblanadi
   if (input.promo.trim()) {

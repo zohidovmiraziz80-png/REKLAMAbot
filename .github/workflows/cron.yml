@@ -1,0 +1,14 @@
+name: MIXBOT muntazam vazifalar
+
+# Tashlab ketilgan savat eslatmalari — har 30 daqiqada
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Eslatmalarni yuborish
+        run: curl -fsS --max-time 60 https://platforma-ebon.vercel.app/api/cron/abandoned || true

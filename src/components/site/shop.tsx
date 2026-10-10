@@ -73,12 +73,37 @@ function loadCart(slug: string): Cart {
   }
 }
 
+const syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 function saveCart(slug: string, cart: Cart) {
   try {
     window.localStorage.setItem(`tz-cart:${slug}`, JSON.stringify(cart));
   } catch {
     // brauzer saqlashga ruxsat bermasa, savat faqat shu sahifada qoladi
   }
+  // Telegram orqali tanilgan mijoz savati serverga (eslatma uchun) — 3 soniyada bir marta
+  const tgLink = telegramLink();
+  const initData = webApp()?.initData ?? "";
+  let session = "";
+  try {
+    const raw = window.localStorage.getItem(`mx-session:${slug}`);
+    session = raw ? ((JSON.parse(raw) as { session?: string }).session ?? "") : "";
+  } catch {
+    // e'tiborsiz
+  }
+  if (!tgLink && !initData && !session) return;
+  clearTimeout(syncTimers.get(slug));
+  syncTimers.set(
+    slug,
+    setTimeout(() => {
+      fetch(`/api/shop/${slug}/cart`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items: Object.entries(cart).map(([id, qty]) => ({ id, qty })), tgLink, initData, session }),
+        keepalive: true,
+      }).catch(() => undefined);
+    }, 3000),
+  );
 }
 
 const btnAccent = "rounded-[var(--s-radius)] bg-[color:var(--s-accent)] font-semibold text-white transition hover:brightness-110 disabled:opacity-50";

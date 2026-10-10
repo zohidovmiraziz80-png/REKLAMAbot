@@ -257,3 +257,34 @@ export const postToChannel = defineAction({
     return { ok: true };
   },
 });
+
+// ===== Tashlab ketilgan savat =====
+
+export type AbandonSettings = { hasBot: boolean; enabled: boolean; hours: number; text: string; waiting: number };
+
+export const getAbandonSettings = defineAction({
+  name: "getAbandonSettings",
+  description: "Tashlab ketilgan savat eslatmasi sozlamalari va hozir kutilayotgan savatlar soni.",
+  input: z.object({}),
+  handler: async (ctx): Promise<AbandonSettings> => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (!bot) return { hasBot: false, enabled: false, hours: 2, text: "", waiting: 0 };
+    const { count } = await db.from("bot_subscribers").select("chat_id", { count: "exact", head: true }).eq("project_id", bot.projectId).not("state->cart", "is", null);
+    return { hasBot: true, enabled: bot.config.abandonEnabled, hours: bot.config.abandonHours, text: bot.config.abandonText, waiting: count ?? 0 };
+  },
+});
+
+export const saveAbandonSettings = defineAction({
+  name: "saveAbandonSettings",
+  description: "Tashlab ketilgan savat eslatmasini yoqadi: necha soatdan keyin va qo'shimcha matn (masalan promo-kod).",
+  input: z.object({ enabled: z.boolean(), hours: z.number().int().min(1).max(48), text: z.string().max(500).default("") }),
+  minRole: "admin",
+  handler: async (ctx, input) => {
+    const db = createAdminClient();
+    const bot = await loadMainBot(db, ctx.workspaceId);
+    if (!bot) throw new ActionError("validation", "Avval Telegram botni ulang");
+    await updateBotConfig(db, bot.projectId, { abandonEnabled: input.enabled, abandonHours: input.hours, abandonText: input.text.trim() });
+    return { ok: true };
+  },
+});

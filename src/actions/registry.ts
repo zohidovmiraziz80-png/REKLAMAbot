@@ -6,7 +6,7 @@ import { connectCrm, getCrmSetup } from "./crm";
 import { getAiSettings, saveAiSettings } from "./ai-assistant";
 import { getConversation, listConversations, sendChatReply } from "./chat";
 import { connectEskiz, getEskizSetup, sendTestSms } from "./sms";
-import { broadcastInfo, channelInfo, deletePromo, listPromos, postProductToChannel, postToChannel, savePromo, sendBroadcastChunk, sendBroadcastTest, setAutoPost, setPromoActive, unlinkPostChannel } from "./marketing";
+import { getAbandonSettings, saveAbandonSettings, broadcastInfo, channelInfo, deletePromo, listPromos, postProductToChannel, postToChannel, savePromo, sendBroadcastChunk, sendBroadcastTest, setAutoPost, setPromoActive, unlinkPostChannel } from "./marketing";
 import { addMember, changePassword, getSettings, removeMember, renameWorkspace, saveProfile, updateMemberRole } from "./settings";
 import { getCardPaySetup, saveCardPaySettings, unlinkPayChannel } from "./card-pay";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
@@ -125,6 +125,8 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   unlinkPostChannel,
   postProductToChannel,
   postToChannel,
+  getAbandonSettings,
+  saveAbandonSettings,
   getEskizSetup,
   connectEskiz,
   sendTestSms,

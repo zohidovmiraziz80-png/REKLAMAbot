@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/actions/run";
-import { deletePromo, postToChannel, savePromo, sendBroadcastChunk, sendBroadcastTest, setAutoPost, setPromoActive, unlinkPostChannel } from "@/actions/marketing";
+import { saveAbandonSettings, deletePromo, postToChannel, savePromo, sendBroadcastChunk, sendBroadcastTest, setAutoPost, setPromoActive, unlinkPostChannel } from "@/actions/marketing";
 
 type Msg = { botProjectId: string; text: string; buttonText: string; buttonUrl: string };
 
@@ -47,4 +47,10 @@ export async function unlinkPostChannelAction() {
 
 export async function postToChannelAction(input: { text: string; imageUrl: string; buttonText: string; buttonUrl: string }) {
   return runAction(postToChannel, input);
+}
+
+export async function saveAbandonAction(input: { enabled: boolean; hours: number; text: string }) {
+  const r = await runAction(saveAbandonSettings, input);
+  if (r.ok) revalidatePath("/dashboard/marketing");
+  return r;
 }

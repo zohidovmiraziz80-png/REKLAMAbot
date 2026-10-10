@@ -325,8 +325,14 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     .single();
 
   const state = ((sub?.state as ChatState | null) ?? {}) as ChatState;
+  // Saqlangan savat (tashlab ketilgan savat eslatmasi uchun) suhbat holati o'zgarganda yo'qolmasin
+  const savedCart = (sub?.state as { cart?: unknown } | null)?.cart;
   const setState = async (s: ChatState) => {
-    await db.from("bot_subscribers").update({ state: s }).eq("project_id", bot.project_id).eq("chat_id", chatId);
+    await db
+      .from("bot_subscribers")
+      .update({ state: savedCart ? { ...s, cart: savedCart } : s })
+      .eq("project_id", bot.project_id)
+      .eq("chat_id", chatId);
   };
 
   // Ega to'lov xabarini (Click bot, bank SMS) botga forward qilsa — mos buyurtma "to'landi" bo'ladi
