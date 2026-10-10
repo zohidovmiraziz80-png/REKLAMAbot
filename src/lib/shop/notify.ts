@@ -36,10 +36,15 @@ export type OrderRow = {
   subtotal: number;
   delivery_price: number;
   total: number;
+  payment_method?: string;
+  payment_status?: string;
+  pay_amount?: number | null;
 };
 
 export const ORDER_COLUMNS =
-  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total";
+  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status, pay_amount";
+
+const PAY_METHOD_LABELS: Record<string, string> = { cash: "Naqd", card: "Kartaga o'tkazma", payme: "Payme", click: "Click", multicard: "Multicard" };
 
 async function loadBots(db: SupabaseClient, workspaceId: string): Promise<BotRow[]> {
   const { data } = await db
@@ -69,6 +74,9 @@ export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
     "",
     o.delivery_price ? `Mahsulotlar: ${formatMoney(o.subtotal)}\nYetkazish: ${formatMoney(o.delivery_price)}` : "",
     `💰 Jami: ${formatMoney(o.total)}`,
+    o.payment_method
+      ? `💳 ${PAY_METHOD_LABELS[o.payment_method] ?? o.payment_method} · ${o.payment_status === "paid" ? "✅ to'langan" : o.payment_status === "refunded" ? "↩️ qaytarilgan" : "⏳ to'lanmagan"}${o.payment_method === "card" && o.pay_amount && o.payment_status !== "paid" ? ` (kutilmoqda: ${formatMoney(o.pay_amount)})` : ""}`
+      : "",
     "",
     `👤 ${o.customer_name ?? "—"}`,
     `📞 ${formatUzPhone(o.phone)}`,
@@ -78,20 +86,22 @@ export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
   return lines.filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n").slice(0, 4000);
 }
 
-export function orderAdminKeyboard(o: Pick<OrderRow, "id">, status: OrderStatus) {
-  if (status === "done" || status === "cancelled") return { inline_keyboard: [] };
+export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, status: OrderStatus) {
+  if (status === "cancelled") return { inline_keyboard: [] };
+  const payRow = o.payment_status === "unpaid" ? [[{ text: "💳 To'landi deb belgilash", callback_data: `pp:${o.id}` }]] : [];
+  if (status === "done") return { inline_keyboard: payRow };
   const btn = (s: OrderStatus, text: string) => ({ text, callback_data: `os:${o.id}:${s}` });
-  const rows =
+  const rows: { text: string; callback_data: string }[][] =
     status === "new"
       ? [[btn("confirmed", "✅ Tasdiqlash"), btn("cancelled", "❌ Bekor qilish")]]
       : status === "confirmed"
         ? [[btn("delivering", "🚚 Yo'lga chiqdi"), btn("done", "🎉 Yakunlash")], [btn("cancelled", "❌ Bekor qilish")]]
         : [[btn("done", "🎉 Yakunlash"), btn("cancelled", "❌ Bekor qilish")]];
-  return { inline_keyboard: rows };
+  return { inline_keyboard: [...rows, ...payRow] };
 }
 
 /** Yangi buyurtma: bot egasiga va ulangan guruhga xabar, mijozga tasdiq */
-export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks?: string) {
+export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks?: string, customerExtra?: string) {
   try {
     const bots = await loadBots(db, order.workspace_id);
     if (!bots.length) return;
@@ -132,7 +142,7 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
         try {
           await tg(cb.token, "sendMessage", {
             chat_id: order.chat_id,
-            text: `✅ Buyurtmangiz qabul qilindi!\n\n🛒 №${order.number}\n${items}\n💰 Jami: ${formatMoney(order.total)}\n\n${thanks || "Tez orada siz bilan bog'lanamiz."}`.slice(0, 4000),
+            text: `✅ Buyurtmangiz qabul qilindi!\n\n🛒 №${order.number}\n${items}\n💰 Jami: ${formatMoney(order.total)}\n\n${customerExtra ? `${customerExtra}\n\n` : ""}${thanks || "Tez orada siz bilan bog'lanamiz."}`.slice(0, 4000),
           });
         } catch {
           // mijoz botni bloklagan bo'lishi mumkin

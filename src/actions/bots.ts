@@ -3,6 +3,7 @@ import { decryptSecret, encryptSecret, isEncryptionConfigured, randomToken } fro
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { BOT_TOKEN_RE, TelegramError, tg, type TgBotInfo } from "@/lib/telegram/api";
+import { ALLOWED_UPDATES, ensureWebhookUpdates } from "@/lib/telegram/webhook";
 import { botConfigSchema, defaultBotConfig, safeWebAppUrl, type BotConfig } from "@/lib/telegram/config";
 import { publicSiteUrls } from "@/lib/site/hosting";
 import { ActionError, defineAction, type ActionContext } from "./define";
@@ -57,22 +58,6 @@ async function publishedSites(ctx: ActionContext) {
 }
 
 /** Xabar maydoni yonidagi menyu tugmasini Mini App'ga yoki oddiy buyruqlar menyusiga o'rnatadi */
-/** Bot qabul qiladigan Telegram yangilanishlari (callback_query — buyurtma tugmalari uchun) */
-const ALLOWED_UPDATES = ["message", "callback_query"];
-
-/** Avval faqat "message" bilan ulangan botlarning webhook'ini yangilaydi (manzil va kalit o'zgarmaydi) */
-async function ensureWebhookUpdates(token: string, projectId: string, secret: string) {
-  const info = await tg<{ url?: string; allowed_updates?: string[]; ip_address?: string }>(token, "getWebhookInfo");
-  if (!info.url || ALLOWED_UPDATES.every((u) => info.allowed_updates?.includes(u))) return;
-  await tg(token, "setWebhook", {
-    url: `${getSiteUrl()}/api/telegram/${projectId}`,
-    secret_token: secret,
-    allowed_updates: ALLOWED_UPDATES,
-    max_connections: 20,
-    ...(info.ip_address ? { ip_address: info.ip_address } : {}),
-  });
-}
-
 async function syncMenuButton(token: string, config: BotConfig) {
   const url = safeWebAppUrl(config.siteUrl);
   await tg(token, "setChatMenuButton", {

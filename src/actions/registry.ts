@@ -1,4 +1,5 @@
 import type { ActionDefinition } from "./define";
+import { getCardPaySetup, saveCardPaySettings, unlinkPayChannel } from "./card-pay";
 import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
 import {
   connectBito,
@@ -78,6 +79,9 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   saveBitoSettings,
   syncBitoNow,
   retryOrderSync,
+  getCardPaySetup,
+  saveCardPaySettings,
+  unlinkPayChannel,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,

@@ -85,7 +85,7 @@ export async function multicardCheckoutUrl(
   return data.checkout_url;
 }
 
-async function ownerBots(db: SupabaseClient, workspaceId: string) {
+export async function ownerBots(db: SupabaseClient, workspaceId: string) {
   const { data } = await db.from("bots").select("project_id, token_encrypted, owner_chat_id").eq("workspace_id", workspaceId);
   return (data ?? []).flatMap((b) => {
     try {
@@ -97,7 +97,7 @@ async function ownerBots(db: SupabaseClient, workspaceId: string) {
 }
 
 /** Buyurtmani "to'langan" deb belgilaydi va egasiga hamda mijozga Telegram'da xabar beradi (bir marta) */
-export async function markOrderPaid(db: SupabaseClient, orderId: string, provider: PayProvider) {
+export async function markOrderPaid(db: SupabaseClient, orderId: string, provider: PayProvider | "card", note = "") {
   const { data: order } = await db
     .from("orders")
     .update({ payment_status: "paid", payment_method: provider, paid_at: new Date().toISOString() })
@@ -108,7 +108,8 @@ export async function markOrderPaid(db: SupabaseClient, orderId: string, provide
   if (!order) return; // allaqachon to'langan
   try {
     const bots = await ownerBots(db, order.workspace_id as string);
-    const text = `💳 Buyurtma №${order.number} to'landi — ${formatMoney(order.total as number)} (${PAY_LABELS[provider]})`;
+    const label = provider === "card" ? "kartaga o'tkazma" : PAY_LABELS[provider];
+    const text = `💳 Buyurtma №${order.number} to'landi — ${formatMoney(order.total as number)} (${label})${note ? `\n${note}` : ""}`;
     const sent = new Set<number>();
     for (const b of bots) {
       if (b.ownerChatId && !sent.has(b.ownerChatId)) {

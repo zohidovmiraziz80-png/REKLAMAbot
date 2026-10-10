@@ -104,6 +104,7 @@ function groups(newOrders: number): Group[] {
             { label: "Payme", href: "/dashboard/integrations/payme" },
             { label: "Click", href: "/dashboard/integrations/click" },
             { label: "Multicard", href: "/dashboard/integrations/multicard" },
+            { label: "Kartaga o'tkazma", href: "/dashboard/integrations/card" },
             { label: "MIXBOT tarifi", href: "/dashboard/plan" },
           ],
         },

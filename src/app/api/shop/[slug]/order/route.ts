@@ -2,7 +2,10 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { decryptSecret } from "@/lib/crypto";
 import { pushOrderToBito } from "@/lib/integrations/bito-sync";
+import { assignPayAmount } from "@/lib/payments/card";
 import { loadPayConfigs } from "@/lib/payments/config";
+import { verifySession } from "@/lib/shop/customer-session";
+import { formatMoney } from "@/lib/shop/format";
 import { clickCheckoutUrl, multicardCheckoutUrl, paymeCheckoutUrl } from "@/lib/payments/core";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { normalizeUzPhone } from "@/lib/phone";
@@ -32,7 +35,8 @@ const body = z.object({
   comment: z.string().trim().max(500).default(""),
   initData: z.string().max(4096).default(""),
   tgLink: z.object({ bot: z.string().max(64), chat: z.string().max(64) }).nullable().default(null),
-  payment: z.enum(["cash", "payme", "click", "multicard"]).default("cash"),
+  payment: z.enum(["cash", "card", "payme", "click", "multicard"]).default("cash"),
+  session: z.string().max(1200).default(""),
   returnUrl: z.string().max(500).default(""),
 });
 
@@ -83,11 +87,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // To'lov usuli: onlayn bo'lsa — shu do'konda ulangan bo'lishi kerak
   const payConfigs = await loadPayConfigs(db, workspaceId);
-  if (input.payment !== "cash" && !payConfigs[input.payment]) return fail("Bu to'lov usuli hozir mavjud emas");
-  if (input.payment === "cash") {
-    const { data: cs } = await db.from("shop_settings").select("cash_enabled").eq("workspace_id", workspaceId).maybeSingle();
-    if (cs && cs.cash_enabled === false) return fail("Iltimos, onlayn to'lov usulini tanlang");
-  }
+  const online = input.payment === "payme" || input.payment === "click" || input.payment === "multicard";
+  if (online && !payConfigs[input.payment as "payme" | "click" | "multicard"]) return fail("Bu to'lov usuli hozir mavjud emas");
+  const { data: cs } = await db.from("shop_settings").select("cash_enabled, card_enabled, card_number, card_holder").eq("workspace_id", workspaceId).maybeSingle();
+  if (input.payment === "cash" && cs && cs.cash_enabled === false) return fail("Iltimos, boshqa to'lov usulini tanlang");
+  if (input.payment === "card" && !(cs?.card_enabled && cs.card_number)) return fail("Bu to'lov usuli hozir mavjud emas");
 
   // Oddiy himoya: bir raqamdan 2 daqiqada 3 tadan ko'p buyurtma bo'lmasin
   const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
@@ -130,6 +134,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
+  // Saytda Telegram orqali kirgan mijoz: buyurtma holati botga keladi
+  if (!tgUser && input.session) {
+    const sess = verifySession(input.session, workspaceId);
+    if (sess?.b && sess.c) {
+      tgUser = { id: sess.c };
+      botProjectId = sess.b;
+    }
+  }
+
   const { data: created, error } = await db.rpc("create_order", {
     p_workspace: workspaceId,
     p_source: tgUser ? "miniapp" : "site",
@@ -162,10 +175,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const result = created as { id: string; number: number; total: number };
   if (input.payment !== "cash") await db.from("orders").update({ payment_method: input.payment }).eq("id", result.id);
 
+  // Kartaga o'tkazma: noyob summa (kanalga tushgan SMS shu summa bo'yicha topiladi)
+  let card: { number: string; holder: string; amount: number } | null = null;
+  if (input.payment === "card" && cs) {
+    const amount = await assignPayAmount(db, workspaceId, result.id, Number(result.total));
+    card = { number: cs.card_number as string, holder: (cs.card_holder as string) || "", amount };
+  }
+
   // Onlayn to'lov havolasi
   let payUrl: string | null = null;
   let payError: string | null = null;
-  if (input.payment !== "cash") {
+  if (online) {
     // To'lovdan keyin mijoz qaytadigan sahifa: buyurtma berilgan sahifaning o'zi (o'z domeni ham ishlaydi)
     const origin = request.headers.get("origin") || getSiteUrl();
     let ret = `${origin.replace(/\/$/, "")}/s/${slug}?order=${result.number}`;
@@ -197,7 +217,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     db.from("orders").select(ORDER_COLUMNS).eq("id", result.id).maybeSingle(),
     db.from("shop_settings").select("order_thanks").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
-  if (order) await notifyNewOrder(db, order as OrderRow, (settings?.order_thanks as string) || undefined);
+  const cardText = card
+    ? `💳 To'lov: ${card.number}${card.holder ? ` (${card.holder})` : ""} kartasiga aynan ${formatMoney(card.amount)} o'tkazing — to'lov avtomatik tasdiqlanadi.`
+    : undefined;
+  if (order) await notifyNewOrder(db, order as OrderRow, (settings?.order_thanks as string) || undefined, cardText);
 
   // Bito ulangan bo'lsa — javobdan keyin fonda sotuv buyurtmasi yaratiladi
   after(async () => {
@@ -210,6 +233,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   return NextResponse.json({
     ok: true,
+    orderId: result.id,
+    card,
     number: result.number,
     total: result.total,
     telegram: !!tgUser,

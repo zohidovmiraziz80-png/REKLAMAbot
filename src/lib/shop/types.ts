@@ -23,6 +23,10 @@ export type PublicShopSettings = {
   minOrder: number;
   /** Naqd (qabul qilganda) to'lov yoqilganmi */
   cashEnabled: boolean;
+  /** Kartaga o'tkazma (kanal SMS orqali avto-tasdiqlash) */
+  cardEnabled: boolean;
+  /** Mijoz kabineti (Telegram orqali kirish) — do'konda bot ulangan bo'lsa */
+  loginEnabled: boolean;
   /** Ulangan onlayn to'lov usullari */
   payMethods: ("payme" | "click" | "multicard")[];
 };

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { handleChannelPost } from "@/lib/payments/card";
+import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 import { ORDER_COLUMNS, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
@@ -25,7 +27,8 @@ type TgCallback = {
   data?: string;
   message?: { message_id: number; chat: { id: number; type: string } };
 };
-export type TgUpdate = { update_id: number; message?: TgMessage; callback_query?: TgCallback };
+type TgChannelPost = { message_id: number; chat: { id: number; type: string; title?: string }; text?: string; caption?: string };
+export type TgUpdate = { update_id: number; message?: TgMessage; callback_query?: TgCallback; channel_post?: TgChannelPost };
 
 export type BotRuntime = {
   project_id: string;
@@ -36,10 +39,11 @@ export type BotRuntime = {
   token: string;
 };
 
-type ChatState = { step?: "phone" | "message"; phone?: string };
+type ChatState = { step?: "phone" | "message" | "login"; phone?: string; token?: string };
 
 const CANCEL = "❌ Bekor qilish";
 const SHARE_PHONE = "📱 Raqamni yuborish";
+const LOGIN_SHARE = "📱 Raqamni yuborish va kirish";
 
 /** Mini App manzili: shu chat uchun imzolangan parametr bilan (buyurtma mijozga bog'lanishi uchun) */
 function appUrl(raw: string, link?: { botProjectId: string; chatId: number }) {
@@ -89,11 +93,11 @@ function parsePhone(msg: TgMessage, text: string): string | null {
 /** Egasi yoki do'kon guruhi buyurtma xabaridagi tugmani bosganda holatni o'zgartiradi */
 async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallback) {
   const answer = (text: string) => tg(bot.token, "answerCallbackQuery", { callback_query_id: cb.id, text }).catch(() => undefined);
-  const m = (cb.data ?? "").match(/^os:([0-9a-f-]{36}):(\w+)$/);
+  const data = cb.data ?? "";
+  const pay = data.match(/^pp:([0-9a-f-]{36})$/);
+  const m = pay ? null : data.match(/^os:([0-9a-f-]{36}):(\w+)$/);
   const chatId = cb.message?.chat.id;
-  if (!m || !chatId || !cb.message) return answer("");
-  const status = m[2] as OrderStatus;
-  if (!ORDER_STATUSES.includes(status)) return answer("");
+  if ((!m && !pay) || !chatId || !cb.message) return answer("");
 
   // Ruxsat: bot egasining chati yoki shu bot orqali ulangan do'kon guruhi
   let allowed = bot.owner_chat_id === chatId;
@@ -102,6 +106,28 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
     allowed = !!s && s.group_chat_id === chatId && s.group_bot_project_id === bot.project_id;
   }
   if (!allowed) return answer("Ruxsat yo'q");
+
+  const who = [cb.from.first_name, cb.from.username ? `@${cb.from.username}` : ""].filter(Boolean).join(" ");
+
+  // "To'landi" tugmasi (masalan, kartaga o'tkazma kanalga tushmagan bo'lsa)
+  if (pay) {
+    const { data: order } = await db.from("orders").select(ORDER_COLUMNS).eq("id", pay[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
+    if (!order) return answer("Buyurtma topilmadi");
+    const o = order as OrderRow;
+    if (o.payment_status !== "paid") await markOrderPaid(db, o.id, (o.payment_method === "payme" || o.payment_method === "click" || o.payment_method === "multicard" ? o.payment_method : "card"), `✏️ Qo'lda belgilandi — ${who}`);
+    await answer("💳 To'landi");
+    const fresh = { ...o, payment_status: "paid" };
+    await tg(bot.token, "editMessageText", {
+      chat_id: chatId,
+      message_id: cb.message.message_id,
+      text: orderAdminText(fresh).slice(0, 4096),
+      reply_markup: orderAdminKeyboard(fresh, o.status),
+    }).catch(() => undefined);
+    return;
+  }
+  if (!m) return answer("");
+  const status = m[2] as OrderStatus;
+  if (!ORDER_STATUSES.includes(status)) return answer("");
 
   const { data: order } = await db.from("orders").select(ORDER_COLUMNS).eq("id", m[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
   if (!order) return answer("Buyurtma topilmadi");
@@ -115,7 +141,6 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
     await notifyCustomerStatus(db, o, status);
   }
   const current = o.status === "cancelled" ? "cancelled" : status;
-  const who = [cb.from.first_name, cb.from.username ? `@${cb.from.username}` : ""].filter(Boolean).join(" ");
   await tg(bot.token, "editMessageText", {
     chat_id: chatId,
     message_id: cb.message.message_id,
@@ -144,6 +169,10 @@ async function handleGroupMessage(db: SupabaseClient, bot: BotRuntime, msg: TgMe
 export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: TgUpdate) {
   if (update.callback_query) {
     await handleCallback(db, bot, update.callback_query);
+    return;
+  }
+  if (update.channel_post) {
+    await handleChannelPost(db, bot, update.channel_post);
     return;
   }
   const msg = update.message;
@@ -190,6 +219,21 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   if (text.startsWith("/start")) {
     const payload = text.split(/\s+/)[1] ?? "";
     await setState({});
+    const login = payload.match(/^login_([a-f0-9]{24})$/);
+    if (login) {
+      const { data: row } = await db.from("customer_logins").select("status, expires_at").eq("token", login[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
+      if (!row || row.status !== "pending" || new Date(row.expires_at as string).getTime() < Date.now()) {
+        await send("⏰ Kirish havolasi eskirgan. Saytda «Kirish» tugmasini qayta bosing.", menu());
+        return;
+      }
+      await setState({ step: "login", token: login[1] });
+      await send("🔐 Saytga kirish uchun telefon raqamingizni tasdiqlang — pastdagi tugmani bosing 👇", {
+        keyboard: [[{ text: LOGIN_SHARE, request_contact: true }], [{ text: CANCEL }]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      });
+      return;
+    }
     if (payload && payload === `owner_${bot.owner_link_code}`) {
       await db.from("bots").update({ owner_chat_id: chatId }).eq("project_id", bot.project_id);
       await send("✅ Siz bu botning administratori sifatida ulandingiz. Yangi buyurtma va arizalar shu chatga keladi.", menu());
@@ -202,6 +246,46 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   if (text === CANCEL) {
     await setState({});
     await send("Bekor qilindi.", menu());
+    return;
+  }
+
+  // Saytga kirish: faqat o'z raqamini (kontakt tugmasi orqali) qabul qilamiz
+  if (state.step === "login" && state.token) {
+    if (!msg.contact || (msg.contact.user_id && msg.contact.user_id !== msg.from?.id) || !msg.contact.user_id) {
+      await send("Iltimos, pastdagi «📱 Raqamni yuborish va kirish» tugmasini bosing (raqamni qo'lda yozish qabul qilinmaydi).", {
+        keyboard: [[{ text: LOGIN_SHARE, request_contact: true }], [{ text: CANCEL }]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      });
+      return;
+    }
+    const raw = msg.contact.phone_number.startsWith("+") ? msg.contact.phone_number : `+${msg.contact.phone_number}`;
+    const phone = normalizeUzPhone(raw) ?? raw.replace(/[^\d+]/g, "").slice(0, 16);
+    const { data: updated } = await db
+      .from("customer_logins")
+      .update({ status: "confirmed", phone, chat_id: chatId, name })
+      .eq("token", state.token)
+      .eq("workspace_id", bot.workspace_id)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .select("token")
+      .maybeSingle();
+    await setState({});
+    if (!updated) {
+      await send("⏰ Kirish havolasi eskirgan. Saytda «Kirish» tugmasini qayta bosing.", menu());
+      return;
+    }
+    // Mijozlar bazasi (CRM): yangi bo'lsa qo'shamiz, bor bo'lsa Telegram'ni bog'laymiz
+    const { data: existing } = await db.from("customers").select("id, name").eq("workspace_id", bot.workspace_id).eq("phone", phone).maybeSingle();
+    if (existing) {
+      await db
+        .from("customers")
+        .update({ telegram_chat_id: chatId, telegram_username: username, ...(existing.name ? {} : { name }) })
+        .eq("id", existing.id);
+    } else {
+      await db.from("customers").insert({ workspace_id: bot.workspace_id, phone, name, telegram_chat_id: chatId, telegram_username: username });
+    }
+    await send("✅ Raqamingiz tasdiqlandi! Saytga qayting — kabinetingiz avtomatik ochiladi.\n\nBuyurtmalaringiz holati shu yerga ham keladi.", menu());
     return;
   }
 

@@ -32,15 +32,17 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
     }
     return rows;
   };
-  const [products, { data: s }, payMethods] = await Promise.all([
+  const [products, { data: s }, payMethods, { count: botCount }] = await Promise.all([
     loadProducts(),
     db
       .from("shop_settings")
-      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, cash_enabled")
+      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, cash_enabled, card_enabled, card_number")
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
     enabledPayMethods(db, workspaceId),
+    db.from("bots").select("project_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
   ]);
+  const cardEnabled = !!(s?.card_enabled && s.card_number);
 
   // Bito ulangan bo'lsa — narx va qoldiq 3 soatdan eski bo'lsa, javobdan keyin fonda yangilanadi
   if (!opts.preview) {
@@ -74,8 +76,10 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
       deliveryPrice: Number(s?.delivery_price ?? 0),
       freeDeliveryFrom: s?.free_delivery_from == null ? null : Number(s.free_delivery_from),
       minOrder: Number(s?.min_order ?? 0),
-      cashEnabled: s?.cash_enabled !== false || payMethods.length === 0,
+      cashEnabled: s?.cash_enabled !== false || (payMethods.length === 0 && !cardEnabled),
+      cardEnabled,
       payMethods,
+      loginEnabled: (botCount ?? 0) > 0,
     },
   };
 }

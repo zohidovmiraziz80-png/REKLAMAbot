@@ -9,6 +9,7 @@ type Card = { id: string; name: string; emoji: string; text: string; href?: stri
 
 const CARDS: Card[] = [
   { id: "bito", name: "Bito", emoji: "📊", group: "Ombor va savdo", text: "Mahsulot, narx va qoldiq Bito'dan; buyurtmalar Bito'ga tushadi", href: "/dashboard/integrations/bito" },
+  { id: "card", name: "Kartaga o'tkazma", emoji: "🏦", group: "To'lov", text: "Kartangizga o'tkazma, kanalga tushgan SMS orqali avto-tasdiq", href: "/dashboard/integrations/card" },
   { id: "payme", name: "Payme", emoji: "💳", group: "To'lov", text: "Saytda va bot ichida karta bilan to'lov", href: "/dashboard/integrations/payme" },
   { id: "click", name: "Click", emoji: "💳", group: "To'lov", text: "Click orqali onlayn to'lov", href: "/dashboard/integrations/click" },
   { id: "multicard", name: "Multicard", emoji: "💳", group: "To'lov", text: "Multicard orqali onlayn to'lov", href: "/dashboard/integrations/multicard" },

@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { formatMoney } from "@/lib/shop/format";
 import type { PublicProduct, ShopData } from "@/lib/shop/types";
+import { AccountButton, useCustomer } from "./account";
 
 /**
  * Saytdagi jonli do'kon: katalog, savat va buyurtma berish.
@@ -487,6 +488,8 @@ export function ShopSection({
         </div>
       )}
 
+      {isOwner && settings.loginEnabled && open === null && !detail && !shop.embedded && <AccountButton slug={shop.slug} raised={count > 0} />}
+
       {isOwner && open && !shop.embedded && (
         <CartDrawer
           shop={shop}
@@ -532,17 +535,22 @@ function CartDrawer({
   const [delivery, setDelivery] = useState<"pickup" | "courier">(s.deliveryEnabled && !s.pickupEnabled ? "courier" : "pickup");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
-  const payOptions: ("cash" | "payme" | "click" | "multicard")[] = [...(s.cashEnabled ? (["cash"] as const) : []), ...s.payMethods];
-  const [payment, setPayment] = useState<"cash" | "payme" | "click" | "multicard">(payOptions[0] ?? "cash");
+  type Pay = "cash" | "card" | "payme" | "click" | "multicard";
+  const payOptions: Pay[] = [...(s.cashEnabled ? (["cash"] as const) : []), ...(s.cardEnabled ? (["card"] as const) : []), ...s.payMethods];
+  const [payment, setPayment] = useState<Pay>(payOptions[0] ?? "cash");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [done, setDone] = useState<{ number: number; total: number } | null>(null);
+  const [done, setDone] = useState<{ number: number; total: number; orderId?: string; card?: { number: string; holder: string; amount: number } | null } | null>(null);
+  const customer = useCustomer(shop.slug);
 
   useEffect(() => {
     const u = webApp()?.initDataUnsafe?.user;
-    if (u && !name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
+    if (customer) {
+      if (!name) setName(customer.customer.name);
+      setPhone(customer.customer.phone);
+    } else if (u && !name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [customer?.session]);
 
   const deliveryPrice =
     delivery === "courier" ? (s.freeDeliveryFrom !== null && subtotal >= s.freeDeliveryFrom ? 0 : s.deliveryPrice) : 0;
@@ -571,6 +579,7 @@ function CartDrawer({
           initData: webApp()?.initData ?? "",
           tgLink: telegramLink(),
           payment,
+          session: customer?.session ?? "",
           returnUrl: window.location.href.split("?")[0],
         }),
       });
@@ -581,13 +590,15 @@ function CartDrawer({
         total?: number;
         payUrl?: string | null;
         payError?: string | null;
+        orderId?: string;
+        card?: { number: string; holder: string; amount: number } | null;
       };
       if (!data.ok) {
         setError(data.error ?? "Buyurtma yuborilmadi. Qayta urinib ko'ring.");
         webApp()?.HapticFeedback?.notificationOccurred("error");
         return;
       }
-      setDone({ number: data.number ?? 0, total: data.total ?? total });
+      setDone({ number: data.number ?? 0, total: data.total ?? total, orderId: data.orderId, card: data.card ?? null });
       onClear();
       if (data.payUrl) {
         // To'lov sahifasiga o'tamiz (Telegram ichida ham shu oynada ochiladi)
@@ -610,7 +621,9 @@ function CartDrawer({
         onClick={(e) => e.stopPropagation()}
         className="s-card max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] p-5 text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
       >
-        {step === "done" ? (
+        {step === "done" && done?.card && done.orderId ? (
+          <CardPayment slug={shop.slug} orderId={done.orderId} number={done.number} card={done.card} inTelegram={inTelegram} onClose={() => onStep(null)} />
+        ) : step === "done" ? (
           <div className="py-6 text-center">
             <div className="text-5xl">✅</div>
             <h3 className="mt-3 text-xl font-bold">Buyurtma №{done?.number} qabul qilindi</h3>
@@ -754,8 +767,10 @@ function CartDrawer({
                         onClick={() => setPayment(m)}
                         className={`rounded-[calc(var(--s-radius)*0.6)] border px-3 py-2.5 text-left text-sm ${payment === m ? "border-[color:var(--s-accent)] font-semibold" : "border-[color:var(--s-line)]"}`}
                       >
-                        {m === "cash" ? "💵 Qabul qilganda" : m === "payme" ? "Payme" : m === "click" ? "Click" : "Multicard"}
-                        <span className="block text-xs font-normal text-[color:var(--s-muted)]">{m === "cash" ? "Naqd yoki karta" : "Onlayn, karta bilan"}</span>
+                        {m === "cash" ? "💵 Qabul qilganda" : m === "card" ? "💳 Kartaga o'tkazma" : m === "payme" ? "Payme" : m === "click" ? "Click" : "Multicard"}
+                        <span className="block text-xs font-normal text-[color:var(--s-muted)]">
+                          {m === "cash" ? "Naqd yoki karta" : m === "card" ? "Ilova orqali, avto-tasdiq" : "Onlayn, karta bilan"}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -768,7 +783,7 @@ function CartDrawer({
                     ←
                   </button>
                   <button type="submit" disabled={sending} className={`${btnAccent} flex-1 py-3`}>
-                    {sending ? "Yuborilmoqda…" : payment === "cash" ? `Buyurtma berish · ${formatMoney(total)}` : `To'lash · ${formatMoney(total)}`}
+                    {sending ? "Yuborilmoqda…" : payment === "cash" || payment === "card" ? `Buyurtma berish · ${formatMoney(total)}` : `To'lash · ${formatMoney(total)}`}
                   </button>
                 </div>
               </form>
@@ -776,6 +791,106 @@ function CartDrawer({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Kartaga o'tkazma: karta raqami, aniq summa va to'lov tushishini kutish */
+function CardPayment({
+  slug,
+  orderId,
+  number,
+  card,
+  inTelegram,
+  onClose,
+}: {
+  slug: string;
+  orderId: string;
+  number: number;
+  card: { number: string; holder: string; amount: number };
+  inTelegram: boolean;
+  onClose: () => void;
+}) {
+  const [paid, setPaid] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (paid) return;
+    const started = Date.now();
+    const t = setInterval(async () => {
+      if (Date.now() - started > 30 * 60 * 1000) return clearInterval(t);
+      try {
+        const r = await fetch(`/api/shop/${slug}/order/${orderId}`, { cache: "no-store" });
+        const d = (await r.json()) as { paymentStatus?: string };
+        if (d.paymentStatus === "paid") {
+          setPaid(true);
+          clearInterval(t);
+          webApp()?.HapticFeedback?.notificationOccurred("success");
+        }
+      } catch {
+        // keyingi safar
+      }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [slug, orderId, paid]);
+
+  const copy = (label: string, text: string) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+
+  if (paid)
+    return (
+      <div className="py-6 text-center">
+        <div className="text-5xl">✅</div>
+        <h3 className="mt-3 text-xl font-bold">To&apos;lov qabul qilindi!</h3>
+        <p className="mt-2 text-[color:var(--s-muted)]">Buyurtma №{number} — {formatMoney(card.amount)}</p>
+        <button type="button" onClick={onClose} className={`${btnAccent} mt-6 w-full py-3`}>
+          Davom etish
+        </button>
+      </div>
+    );
+
+  return (
+    <div className="py-2">
+      <h3 className="text-center text-xl font-bold">Buyurtma №{number} qabul qilindi</h3>
+      <p className="mt-1 text-center text-sm text-[color:var(--s-muted)]">Quyidagi kartaga to&apos;lov qiling (Click, Payme, bank ilovasi orqali)</p>
+      <div className="mt-4 space-y-2">
+        <button type="button" onClick={() => copy("card", card.number.replace(/\s/g, ""))} className="w-full rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-line)] p-3 text-left">
+          <span className="block text-xs text-[color:var(--s-muted)]">Karta raqami {card.holder ? `· ${card.holder}` : ""}</span>
+          <span className="flex items-center justify-between font-mono text-lg font-bold tracking-wider">
+            {card.number}
+            <span className="font-sans text-xs font-medium text-[color:var(--s-accent)]">{copied === "card" ? "Nusxalandi ✓" : "Nusxalash"}</span>
+          </span>
+        </button>
+        <button type="button" onClick={() => copy("sum", String(card.amount))} className="w-full rounded-[calc(var(--s-radius)*0.6)] border-2 border-[color:var(--s-accent)] p-3 text-left">
+          <span className="block text-xs text-[color:var(--s-muted)]">Aynan shu summani o&apos;tkazing</span>
+          <span className="flex items-center justify-between text-2xl font-bold">
+            {formatMoney(card.amount)}
+            <span className="text-xs font-medium text-[color:var(--s-accent)]">{copied === "sum" ? "Nusxalandi ✓" : "Nusxalash"}</span>
+          </span>
+        </button>
+      </div>
+      <p className="mt-3 rounded-[calc(var(--s-radius)*0.6)] bg-[color:var(--s-surface)] p-3 text-xs text-[color:var(--s-muted)]">
+        ⚡ Summa so&apos;migacha aynan mos bo&apos;lsa, to&apos;lov bir necha soniyada avtomatik tasdiqlanadi. Boshqa summa o&apos;tkazsangiz, sotuvchi qo&apos;lda tekshiradi.
+      </p>
+      <div className="mt-4 flex items-center justify-center gap-2 text-sm text-[color:var(--s-muted)]">
+        <span className="size-4 animate-spin rounded-full border-2 border-[color:var(--s-accent)] border-t-transparent" />
+        To&apos;lov kutilmoqda…
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          const w = webApp();
+          if (w) w.close();
+          else onClose();
+        }}
+        className="mt-4 w-full rounded-[var(--s-radius)] border border-[color:var(--s-line)] py-3 text-sm"
+      >
+        {inTelegram ? "Yopish (holat botga keladi)" : "Keyinroq to'layman"}
+      </button>
     </div>
   );
 }
