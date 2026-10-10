@@ -18,6 +18,7 @@ import {
   type PaymentStatus,
 } from "@/lib/shop/format";
 import { retryOrderSyncAction, updateOrderAction } from "./actions";
+import { BtsPanel } from "./bts-panel";
 import { YandexPanel } from "./yandex-panel";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
@@ -30,7 +31,7 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
 
 const select = "rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500";
 
-export function OrdersList({ initial, emptyAll, yandex = false }: { initial: Order[]; emptyAll: boolean; yandex?: boolean }) {
+export function OrdersList({ initial, emptyAll, yandex = false, bts = false }: { initial: Order[]; emptyAll: boolean; yandex?: boolean; bts?: boolean }) {
   const [orders, setOrders] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(initial[0]?.status === "new" ? initial[0].id : null);
 
@@ -65,6 +66,7 @@ export function OrdersList({ initial, emptyAll, yandex = false }: { initial: Ord
           open={openId === o.id}
           onToggle={() => setOpenId(openId === o.id ? null : o.id)}
           yandex={yandex}
+          bts={bts}
           onChange={(patch) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...patch } : x)))}
         />
       ))}
@@ -78,12 +80,14 @@ function OrderCard({
   onToggle,
   onChange,
   yandex,
+  bts,
 }: {
   order: Order;
   open: boolean;
   onToggle: () => void;
   onChange: (p: Partial<Order>) => void;
   yandex: boolean;
+  bts: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -269,6 +273,14 @@ function OrderCard({
             ) : null}
             {yandex && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.yandex) && (
               <YandexPanel orderId={o.id} ext={o.external_ids ?? {}} onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })} />
+            )}
+            {bts && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.bts) && (
+              <BtsPanel
+                orderId={o.id}
+                ext={o.external_ids ?? {}}
+                unpaid={o.payment_status !== "paid"}
+                onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })}
+              />
             )}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
