@@ -76,6 +76,9 @@ export async function middleware(request: NextRequest) {
     return new NextResponse("Bu domenga sayt ulanmagan", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
 
+  // Telegram webhook sessiya talab qilmaydi (maxfiy kalit bilan tekshiriladi)
+  if (path.startsWith("/api/telegram/")) return NextResponse.next();
+
   // Ommaviy saytlar sessiya talab qilmaydi; tashqaridan kelgan x-site-base sarlavhasini olib tashlaymiz
   if (path.startsWith("/s/")) {
     const headers = new Headers(request.headers);

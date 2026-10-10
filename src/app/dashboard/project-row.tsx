@@ -80,8 +80,8 @@ export function ProjectRow({ project }: { project: Project }) {
               </button>
             </form>
           ) : (
-            project.type === "website" ? (
-              <Link href={`/dashboard/sites/${project.id}`} className="block truncate font-medium hover:text-brand-600">
+            project.type !== "automation" ? (
+              <Link href={`/dashboard/${project.type === "website" ? "sites" : "bots"}/${project.id}`} className="block truncate font-medium hover:text-brand-600">
                 {project.name}
               </Link>
             ) : (
@@ -99,9 +99,9 @@ export function ProjectRow({ project }: { project: Project }) {
 
         {!editing && (
           <div className="flex flex-wrap gap-1">
-            {project.type === "website" && (
+            {project.type !== "automation" && (
               <Link
-                href={`/dashboard/sites/${project.id}`}
+                href={`/dashboard/${project.type === "website" ? "sites" : "bots"}/${project.id}`}
                 className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
               >
                 Ochish

@@ -5,7 +5,9 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Holat:** 3-bosqich (Nashr qilish) — sayt `/s/<nom>` manzilida internetga chiqadi; asosiy domen ulanganda `<nom>.<domen>` subdomeni; o'z domenini ulash (Vercel API) va `/admin/domains` admin paneli.
+**Holat:** 4-bosqich (Telegram Bot Builder) — BotFather tokeni bilan bot ulash (token shifrlanadi), menyu tugmalari va javoblar, ariza/buyurtma qabul qilish, egaga Telegram orqali xabar, arizalar ro'yxati.
+
+**3-bosqich (Nashr qilish)** — sayt `/s/<nom>` manzilida internetga chiqadi; asosiy domen ulanganda `<nom>.<domen>` subdomeni; o'z domenini ulash (Vercel API) va `/admin/domains` admin paneli.
 
 **2-bosqich (Website Builder)** — 6 ta tayyor shablondan sayt yaratish, vizual tahrirlovchi, ko'rib chiqish sahifasi. AI (yaratish va tahrirlash) kodi tayyor, lekin `AI_ENABLED=true` qo'yilmaguncha o'chiq.
 
@@ -19,7 +21,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 ### 2. Bazani tayyorlash (migration)
 1. Supabase'da **SQL Editor → New query** oching.
-2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql`) joylab **Run** bosing.
+2. `supabase/migrations/` ichidagi fayllarni nomi bo'yicha tartib bilan (`..._foundation.sql` → `..._profile_phone.sql` → `..._websites.sql` → `..._publishing.sql` → `..._bots.sql`) joylab **Run** bosing.
 3. **Table Editor**'da `profiles`, `workspaces`, `workspace_members`, `projects`, `audit_logs` jadvallari paydo bo'lganini tekshiring.
 
 ### 3. Auth sozlamalari
@@ -57,6 +59,11 @@ Yoqish uchun Vercel'da `AI_ENABLED=true` qo'shing. Vercel'da AI Gateway OIDC orq
 - **Subdomenlar** (`gulzor.tezdokon.uz`): domen sotib oling, Vercel → Domains'da `tezdokon.uz` va `*.tezdokon.uz` ni qo'shing (wildcard uchun domen nameserver'lari Vercel'da bo'lishi kerak), keyin `NEXT_PUBLIC_ROOT_DOMAIN=tezdokon.uz`.
 - **O'z domeni:** `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` qo'shilgach, foydalanuvchilar "Nashr qilish" oynasidan domen ulaydi va DNS yozuvlarini ko'radi.
 - **Admin:** `insert into public.platform_admins (user_id) values ('<auth.users id>');` → `/admin/domains`.
+
+### 4.3 Telegram botlar
+- `BOT_TOKEN_KEY` (32 bayt base64) Vercel'da maxfiy o'zgaruvchi sifatida turishi kerak — usiz bot ulab bo'lmaydi.
+- Webhook: `https://<platforma>/api/telegram/<projectId>`, `X-Telegram-Bot-Api-Secret-Token` bilan tekshiriladi.
+- Server `SUPABASE_SERVICE_ROLE_KEY` dan foydalanadi (Vercel–Supabase integratsiyasi avtomatik qo'shgan).
 
 ### 5. Kompyuterda ishga tushirish (ixtiyoriy)
 ```bash

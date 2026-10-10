@@ -1,4 +1,5 @@
 import type { ActionDefinition } from "./define";
+import { connectBot, disconnectBot, getBot, saveBotConfig, updateBotRequestStatus } from "./bots";
 import { createProject, deleteProject, listProjects, renameProject } from "./projects";
 import {
   addCustomDomain,
@@ -31,6 +32,11 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   addCustomDomain,
   checkCustomDomain,
   removeCustomDomain,
+  getBot,
+  connectBot,
+  saveBotConfig,
+  disconnectBot,
+  updateBotRequestStatus,
 ];
 
 export function getAction(name: string) {

@@ -34,6 +34,7 @@ export function CreateProject({ defaultType }: { defaultType?: ProjectType }) {
         form.reset();
         close();
         if (result.data.type === "website") router.push(`/dashboard/sites/${result.data.id}`);
+        if (result.data.type === "bot") router.push(`/dashboard/bots/${result.data.id}`);
       } else {
         setError(result.error);
       }
