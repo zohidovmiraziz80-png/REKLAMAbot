@@ -5,7 +5,7 @@ Arxitektura va qoidalar: [CLAUDE.md](./CLAUDE.md).
 
 **Sayt:** https://platforma-ebon.vercel.app
 
-**Tariflar:** Bot, Sayt, Sayt + Bot. Yangi mijoz 14 kunlik "Sayt + Bot" sinov bilan boshlaydi; admin `/admin/workspaces` dan tarif/narxni boshqaradi (onlayn to'lov keyin). Bot sayt­ni Telegram ichida Mini App sifatida ochadi.
+**Tariflar:** Bot, Sayt, Sayt + Bot. Yangi mijoz 14 kunlik "Sayt + Bot" sinov bilan boshlaydi; admin `/admin/workspaces` dan tarif/narxni boshqaradi (onlayn to'lov keyin). Bot saytni Telegram ichida Mini App sifatida ochadi.
 
 **4-bosqich (Telegram Bot Builder)** — BotFather tokeni bilan bot ulash (token shifrlanadi), menyu tugmalari va javoblar, ariza/buyurtma qabul qilish, egaga Telegram orqali xabar, arizalar ro'yxati.
 
