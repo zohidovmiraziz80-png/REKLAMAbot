@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { tg } from "./api";
-import { botConfigSchema, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
+import { botConfigSchema, buttonRows, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
 
 /**
  * Telegram'dan kelgan har bir xabarni qayta ishlaydi:
@@ -34,15 +34,12 @@ const SHARE_PHONE = "📱 Raqamni yuborish";
 
 function menuKeyboard(cfg: BotConfig) {
   if (!cfg.buttons.length) return { remove_keyboard: true };
-  const rows: { text: string; web_app?: { url: string } }[][] = [];
-  for (let i = 0; i < cfg.buttons.length; i += 2) {
-    rows.push(
-      cfg.buttons.slice(i, i + 2).map((b) => {
-        const url = b.type === "webapp" ? safeWebAppUrl(b.url || cfg.siteUrl) : null;
-        return url ? { text: b.label, web_app: { url } } : { text: b.label };
-      }),
-    );
-  }
+  const rows = buttonRows(cfg.buttons).map((row) =>
+    row.map((b) => {
+      const url = b.type === "webapp" ? safeWebAppUrl(b.url || cfg.siteUrl) : null;
+      return url ? { text: b.label, web_app: { url } } : { text: b.label };
+    }),
+  );
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
 
@@ -113,12 +110,6 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
       return;
     }
     await send(cfg.welcome, menuKeyboard(cfg));
-    const siteUrl = safeWebAppUrl(cfg.siteUrl);
-    if (siteUrl) {
-      await send("👇 Do'konimizni Telegram ichida oching", {
-        inline_keyboard: [[{ text: `🛍 ${cfg.menuButtonText || "Do'kon"}`, web_app: { url: siteUrl } }]],
-      });
-    }
     return;
   }
 
@@ -179,6 +170,31 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
     if (button.type === "request") {
       await setState({ step: "phone" });
       await send(cfg.requestPhonePrompt, phoneKeyboard());
+      return;
+    }
+    if (button.type === "orders") {
+      const { data: orders } = await db
+        .from("bot_requests")
+        .select("id, message, status, created_at")
+        .eq("project_id", bot.project_id)
+        .eq("chat_id", chatId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      const siteUrl = safeWebAppUrl(cfg.siteUrl);
+      if (!orders?.length) {
+        await send(
+          "Sizda hali buyurtma yo'q.",
+          siteUrl ? { inline_keyboard: [[{ text: "🛍 Do'konni ochish", web_app: { url: siteUrl } }]] } : menuKeyboard(cfg),
+        );
+        return;
+      }
+      const label: Record<string, string> = { new: "🆕 Qabul qilindi", in_progress: "⏳ Jarayonda", done: "✅ Bajarildi", cancelled: "❌ Bekor qilindi" };
+      const lines = orders.map((o) => {
+        const d = new Date(new Date(o.created_at as string).getTime() + 5 * 3600 * 1000);
+        const date = `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+        return `№${o.id} · ${date} · ${label[o.status as string] ?? o.status}\n${String(o.message).slice(0, 120)}`;
+      });
+      await send(`📦 Oxirgi buyurtmalaringiz:\n\n${lines.join("\n\n")}`, menuKeyboard(cfg));
       return;
     }
     if (button.type === "webapp") {

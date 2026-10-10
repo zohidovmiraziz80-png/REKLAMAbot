@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { BotInfo, BotRequest, RequestStatus } from "@/actions/bots";
-import { BUTTON_TYPES, BUTTON_TYPE_LABELS, type BotButton, type BotConfig } from "@/lib/telegram/config";
+import { BUTTON_TYPES, BUTTON_TYPE_LABELS, buttonRows, defaultBotConfig, type BotButton, type BotConfig } from "@/lib/telegram/config";
 import { disconnectBotAction, saveBotConfigAction, updateRequestStatusAction } from "./actions";
 
 const input =
@@ -44,8 +44,7 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
 // ===== Telegram ko'rinishidagi jonli namuna =====
 
 function ChatPreview({ username, config }: { username: string; config: BotConfig }) {
-  const rows: BotButton[][] = [];
-  for (let i = 0; i < config.buttons.length; i += 2) rows.push(config.buttons.slice(i, i + 2));
+  const rows = buttonRows(config.buttons);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-[#e7ebf0]">
       <div className="flex items-center gap-2 bg-[#517da2] px-4 py-3 text-white">
@@ -321,9 +320,22 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
             </section>
 
             <section className="space-y-3 rounded-xl border border-line bg-white p-4">
-              <div>
-                <h2 className="text-sm font-semibold">Menyu tugmalari</h2>
-                <p className="text-xs text-muted">Pastki menyuda ikkitadan qatorga joylashadi (12 tagacha).</p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold">Menyu tugmalari</h2>
+                  <p className="text-xs text-muted">Ikkitadan qatorga joylashadi; &quot;Butun qator&quot; belgilangani alohida qatorda (12 tagacha).</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Menyu tavsiya etilgan ko'rinishga almashtirilsinmi? (Do'konni ochish · Buyurtmalarim · Aloqa)")) {
+                      update({ buttons: defaultBotConfig(initial.projectName, config.siteUrl).buttons });
+                    }
+                  }}
+                  className="rounded-md border border-line px-2.5 py-1 text-xs font-medium hover:border-brand-500"
+                >
+                  ↺ Tavsiya etilgan menyu
+                </button>
               </div>
               {config.buttons.map((b, i) => (
                 <div key={b.id} className="space-y-2 rounded-lg border border-line bg-surface/60 p-3">
@@ -351,13 +363,23 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
                       ✕
                     </button>
                   </div>
-                  <select value={b.type} onChange={(e) => updateButton(b.id, { type: e.target.value as BotButton["type"] })} className={input}>
-                    {BUTTON_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {BUTTON_TYPE_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={b.type}
+                      onChange={(e) => updateButton(b.id, { type: e.target.value as BotButton["type"] })}
+                      className={`${input} min-w-0 flex-1`}
+                    >
+                      {BUTTON_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {BUTTON_TYPE_LABELS[t]}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted">
+                      <input type="checkbox" checked={b.wide} onChange={(e) => updateButton(b.id, { wide: e.target.checked })} className="accent-brand-600" />
+                      Butun qator
+                    </label>
+                  </div>
                   {b.type === "text" && (
                     <textarea
                       value={b.text}
@@ -385,6 +407,9 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
                       <input value={b.text} onChange={(e) => updateButton(b.id, { text: e.target.value })} placeholder="Izoh (ixtiyoriy)" className={input} />
                     </div>
                   )}
+                  {b.type === "orders" && (
+                    <p className="text-xs text-muted">Mijoz bosganda bot uning oxirgi 5 ta buyurtmasini holati bilan ko&apos;rsatadi.</p>
+                  )}
                   {b.type === "request" && (
                     <p className="text-xs text-muted">Bot mijozdan telefon raqami va xabarini so&apos;raydi, so&apos;ng arizani &quot;Arizalar&quot; bo&apos;limiga saqlaydi.</p>
                   )}
@@ -393,7 +418,7 @@ export function BotDashboard({ initial }: { initial: BotInfo }) {
               {config.buttons.length < 12 && (
                 <button
                   type="button"
-                  onClick={() => update({ buttons: [...config.buttons, { id: newId(), label: "", type: "text", text: "", url: "" }] })}
+                  onClick={() => update({ buttons: [...config.buttons, { id: newId(), label: "", type: "text", text: "", url: "", wide: false }] })}
                   className="w-full rounded-lg border border-dashed border-line py-2 text-sm font-medium text-brand-600 hover:border-brand-500"
                 >
                   + Tugma qo&apos;shish

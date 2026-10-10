@@ -10,11 +10,12 @@ const txt = (max: number, fallback = "") =>
     .transform((s) => s.trim().slice(0, max))
     .catch(fallback);
 
-export const BUTTON_TYPES = ["webapp", "text", "link", "request"] as const;
+export const BUTTON_TYPES = ["webapp", "orders", "text", "link", "request"] as const;
 export type BotButtonType = (typeof BUTTON_TYPES)[number];
 
 export const BUTTON_TYPE_LABELS: Record<BotButtonType, string> = {
   webapp: "Saytni bot ichida ochish (Mini App)",
+  orders: "Buyurtmalarim (mijoz o'z buyurtmalarini ko'radi)",
   text: "Matnli javob",
   request: "Ariza / buyurtma qabul qilish",
   link: "Havola (sayt, kanal)",
@@ -30,6 +31,8 @@ export const botButtonSchema = z.object({
   type: z.enum(BUTTON_TYPES).catch("text"),
   text: txt(2000),
   url: txt(300),
+  /** Tugma butun qatorni egallaydi */
+  wide: z.boolean().catch(false),
 });
 
 export type BotButton = z.output<typeof botButtonSchema>;
@@ -69,9 +72,9 @@ export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig 
   return {
     welcome: `Assalomu alaykum! ${businessName} botiga xush kelibsiz. Kerakli bo'limni tanlang 👇`,
     buttons: [
-      { id: "shop", label: "🛍 Do'konni ochish", type: "webapp", text: "", url: siteUrl },
-      { id: "about", label: "ℹ️ Biz haqimizda", type: "text", text: `${businessName} haqida qisqacha ma'lumot yozing.`, url: "" },
-      { id: "contact", label: "📞 Aloqa", type: "text", text: "Telefon: \nManzil: \nIsh vaqti: ", url: "" },
+      { id: "shop", label: "🛍 Do'konni ochish", type: "webapp", text: "", url: siteUrl, wide: true },
+      { id: "orders", label: "📦 Buyurtmalarim", type: "orders", text: "", url: "", wide: false },
+      { id: "contact", label: "☎️ Aloqa", type: "text", text: `${businessName}\nTelefon: \nManzil: \nIsh vaqti: `, url: "", wide: false },
     ],
     requestPhonePrompt: DEFAULT_TEXTS.requestPhonePrompt,
     requestMessagePrompt: DEFAULT_TEXTS.requestMessagePrompt,
@@ -79,6 +82,28 @@ export function defaultBotConfig(businessName: string, siteUrl = ""): BotConfig 
     siteUrl,
     menuButtonText: "Do'kon",
   };
+}
+
+/** Tugmalarni qatorlarga ajratadi: "wide" tugma alohida qator, qolganlari ikkitadan */
+export function buttonRows(buttons: BotButton[]): BotButton[][] {
+  const rows: BotButton[][] = [];
+  let pending: BotButton | null = null;
+  for (const b of buttons) {
+    if (b.wide) {
+      if (pending) {
+        rows.push([pending]);
+        pending = null;
+      }
+      rows.push([b]);
+    } else if (pending) {
+      rows.push([pending, b]);
+      pending = null;
+    } else {
+      pending = b;
+    }
+  }
+  if (pending) rows.push([pending]);
+  return rows;
 }
 
 /** Mini App uchun faqat https manzil */
