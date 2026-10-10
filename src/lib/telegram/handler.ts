@@ -3,7 +3,7 @@ import { handleChannelPost } from "@/lib/payments/card";
 import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
-import { ORDER_COLUMNS, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
+import { loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
 import { tg } from "./api";
 import { withChatLink } from "./chat-link";
 import { botConfigSchema, buttonRows, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
@@ -111,7 +111,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
 
   // "To'landi" tugmasi (masalan, kartaga o'tkazma kanalga tushmagan bo'lsa)
   if (pay) {
-    const { data: order } = await db.from("orders").select(ORDER_COLUMNS).eq("id", pay[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
+    const order = await loadOrderRow(db, pay[1], bot.workspace_id);
     if (!order) return answer("Buyurtma topilmadi");
     const o = order as OrderRow;
     if (o.payment_status !== "paid") await markOrderPaid(db, o.id, (o.payment_method === "payme" || o.payment_method === "click" || o.payment_method === "multicard" ? o.payment_method : "card"), `✏️ Qo'lda belgilandi — ${who}`);
@@ -129,7 +129,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
   const status = m[2] as OrderStatus;
   if (!ORDER_STATUSES.includes(status)) return answer("");
 
-  const { data: order } = await db.from("orders").select(ORDER_COLUMNS).eq("id", m[1]).eq("workspace_id", bot.workspace_id).maybeSingle();
+  const order = await loadOrderRow(db, m[1], bot.workspace_id);
   if (!order) return answer("Buyurtma topilmadi");
   const o = order as OrderRow;
   if (o.status === "cancelled" || o.status === status) {

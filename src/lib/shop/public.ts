@@ -32,13 +32,29 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
     }
     return rows;
   };
-  const [products, { data: s }, payMethods, { count: botCount }] = await Promise.all([
+  const BASE_COLS = "accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, cash_enabled";
+  type SettingsRow = {
+    accept_orders: boolean;
+    pickup_enabled: boolean;
+    pickup_address: string;
+    delivery_enabled: boolean;
+    delivery_price: number;
+    free_delivery_from: number | null;
+    min_order: number;
+    cash_enabled: boolean;
+    card_enabled?: boolean;
+    card_number?: string;
+  };
+  const loadSettings = async (): Promise<SettingsRow | null> => {
+    const r = await db.from("shop_settings").select(`${BASE_COLS}, card_enabled, card_number`).eq("workspace_id", workspaceId).maybeSingle();
+    if (!r.error) return r.data as unknown as SettingsRow | null;
+    // Karta ustunlari hali bazada bo'lmasa
+    const legacy = await db.from("shop_settings").select(BASE_COLS).eq("workspace_id", workspaceId).maybeSingle();
+    return legacy.data as unknown as SettingsRow | null;
+  };
+  const [products, s, payMethods, { count: botCount }] = await Promise.all([
     loadProducts(),
-    db
-      .from("shop_settings")
-      .select("accept_orders, pickup_enabled, pickup_address, delivery_enabled, delivery_price, free_delivery_from, min_order, cash_enabled, card_enabled, card_number")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle(),
+    loadSettings(),
     enabledPayMethods(db, workspaceId),
     db.from("bots").select("project_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
   ]);

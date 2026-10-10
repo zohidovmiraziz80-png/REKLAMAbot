@@ -10,7 +10,7 @@ import { clickCheckoutUrl, multicardCheckoutUrl, paymeCheckoutUrl } from "@/lib/
 import { getSiteUrl } from "@/lib/supabase/env";
 import { normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
-import { ORDER_COLUMNS, notifyNewOrder, type OrderRow } from "@/lib/shop/notify";
+import { loadOrderRow, notifyNewOrder } from "@/lib/shop/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyChatLink } from "@/lib/telegram/chat-link";
 import { verifyInitData, type WebAppUser } from "@/lib/telegram/webapp";
@@ -89,7 +89,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const payConfigs = await loadPayConfigs(db, workspaceId);
   const online = input.payment === "payme" || input.payment === "click" || input.payment === "multicard";
   if (online && !payConfigs[input.payment as "payme" | "click" | "multicard"]) return fail("Bu to'lov usuli hozir mavjud emas");
-  const { data: cs } = await db.from("shop_settings").select("cash_enabled, card_enabled, card_number, card_holder").eq("workspace_id", workspaceId).maybeSingle();
+  let { data: cs } = await db.from("shop_settings").select("cash_enabled, card_enabled, card_number, card_holder").eq("workspace_id", workspaceId).maybeSingle();
+  if (!cs) {
+    // Karta ustunlari hali bazada bo'lmasa
+    const legacy = await db.from("shop_settings").select("cash_enabled").eq("workspace_id", workspaceId).maybeSingle();
+    cs = legacy.data ? { ...legacy.data, card_enabled: false, card_number: "", card_holder: "" } : null;
+  }
   if (input.payment === "cash" && cs && cs.cash_enabled === false) return fail("Iltimos, boshqa to'lov usulini tanlang");
   if (input.payment === "card" && !(cs?.card_enabled && cs.card_number)) return fail("Bu to'lov usuli hozir mavjud emas");
 
@@ -214,13 +219,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Telegram xabarlari (javobni kechiktirmaslik uchun xatolar yutiladi)
   const [{ data: order }, { data: settings }] = await Promise.all([
-    db.from("orders").select(ORDER_COLUMNS).eq("id", result.id).maybeSingle(),
+    loadOrderRow(db, result.id).then((data) => ({ data })),
     db.from("shop_settings").select("order_thanks").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
   const cardText = card
     ? `💳 To'lov: ${card.number}${card.holder ? ` (${card.holder})` : ""} kartasiga aynan ${formatMoney(card.amount)} o'tkazing — to'lov avtomatik tasdiqlanadi.`
     : undefined;
-  if (order) await notifyNewOrder(db, order as OrderRow, (settings?.order_thanks as string) || undefined, cardText);
+  if (order) await notifyNewOrder(db, order, (settings?.order_thanks as string) || undefined, cardText);
 
   // Bito ulangan bo'lsa — javobdan keyin fonda sotuv buyurtmasi yaratiladi
   after(async () => {

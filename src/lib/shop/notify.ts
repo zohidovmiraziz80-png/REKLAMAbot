@@ -44,6 +44,22 @@ export type OrderRow = {
 export const ORDER_COLUMNS =
   "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status, pay_amount";
 
+const LEGACY_ORDER_COLUMNS =
+  "id, workspace_id, number, source, bot_project_id, chat_id, customer_name, phone, address, comment, delivery_method, status, items, subtotal, delivery_price, total, payment_method, payment_status";
+
+/** Buyurtmani o'qish (yangi ustunlar hali bazada bo'lmasa — eski ro'yxat bilan) */
+export async function loadOrderRow(db: SupabaseClient, id: string, workspaceId?: string): Promise<OrderRow | null> {
+  const run = (cols: string) => {
+    let q = db.from("orders").select(cols).eq("id", id);
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q.maybeSingle();
+  };
+  const first = await run(ORDER_COLUMNS);
+  if (!first.error) return (first.data as unknown as OrderRow | null) ?? null;
+  const second = await run(LEGACY_ORDER_COLUMNS);
+  return (second.data as unknown as OrderRow | null) ?? null;
+}
+
 const PAY_METHOD_LABELS: Record<string, string> = { cash: "Naqd", card: "Kartaga o'tkazma", payme: "Payme", click: "Click", multicard: "Multicard" };
 
 async function loadBots(db: SupabaseClient, workspaceId: string): Promise<BotRow[]> {

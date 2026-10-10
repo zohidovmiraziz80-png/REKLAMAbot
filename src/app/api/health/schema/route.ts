@@ -1,0 +1,15 @@
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/** Oxirgi migratsiyalar bazada qo'llanganini tekshirish (faqat ha/yo'q, ma'lumot qaytarmaydi) */
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const db = createAdminClient();
+  const [a, b, c] = await Promise.all([
+    db.from("shop_settings").select("card_enabled").limit(1),
+    db.from("customer_logins").select("token").limit(1),
+    db.from("orders").select("pay_amount").limit(1),
+  ]);
+  return NextResponse.json({ cardColumns: !a.error, customerLogins: !b.error, payAmount: !c.error });
+}
