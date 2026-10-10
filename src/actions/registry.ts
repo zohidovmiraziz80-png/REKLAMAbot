@@ -1,6 +1,7 @@
 import type { ActionDefinition } from "./define";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, connectBts, getBtsSetup, saveBtsSettings, connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
 import { getMetrics } from "./metrics";
+import { connectCrm, getCrmSetup } from "./crm";
 import { getAiSettings, saveAiSettings } from "./ai-assistant";
 import { getConversation, listConversations, sendChatReply } from "./chat";
 import { connectEskiz, getEskizSetup, sendTestSms } from "./sms";
@@ -126,6 +127,8 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   sendChatReply,
   getAiSettings,
   saveAiSettings,
+  getCrmSetup,
+  connectCrm,
   disconnectIntegration,
   getPaySetup,
   connectPayProvider,

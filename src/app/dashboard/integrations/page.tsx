@@ -18,8 +18,8 @@ const CARDS: Card[] = [
   { id: "bts", name: "BTS", emoji: "📦", group: "Yetkazish", text: "Viloyatlarga jo'natish, trek raqami mijozga", href: "/dashboard/integrations/bts" },
   { id: "fargo", name: "Fargo", emoji: "🚚", group: "Yetkazish", text: "Kuryer va pochta xizmati — Fargo API berishini kutyapmiz" },
   { id: "eskiz", name: "Eskiz SMS", emoji: "✉️", group: "Xabarnoma", text: "Mijozga buyurtma holati SMS bilan", href: "/dashboard/integrations/eskiz" },
-  { id: "amocrm", name: "AmoCRM", emoji: "🗂", group: "CRM", text: "Mijoz va buyurtmalar AmoCRM'ga" },
-  { id: "bitrix24", name: "Bitrix24", emoji: "🗂", group: "CRM", text: "Mijoz va buyurtmalar Bitrix24'ga" },
+  { id: "amocrm", name: "AmoCRM", emoji: "🗂", group: "CRM", text: "Yangi buyurtma AmoCRM'ga lid bo'lib tushadi", href: "/dashboard/integrations/amocrm" },
+  { id: "bitrix24", name: "Bitrix24", emoji: "🗂", group: "CRM", text: "Yangi buyurtma Bitrix24'ga bitim yoki lid bo'lib tushadi", href: "/dashboard/integrations/bitrix24" },
 ];
 
 export default async function IntegrationsPage() {

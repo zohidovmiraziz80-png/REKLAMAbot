@@ -2,6 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { decryptSecret } from "@/lib/crypto";
 import { pushOrderToBito } from "@/lib/integrations/bito-sync";
+import { pushOrderToCrm } from "@/lib/integrations/crm";
 import { assignPayAmount } from "@/lib/payments/card";
 import { loadPayConfigs } from "@/lib/payments/config";
 import { verifySession } from "@/lib/shop/customer-session";
@@ -256,6 +257,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Bito ulangan bo'lsa — javobdan keyin fonda sotuv buyurtmasi yaratiladi
   if (plan.integrations) after(async () => {
+    try {
+      await pushOrderToCrm(db, result.id);
+    } catch (err) {
+      console.error("CRM'ga yuborilmadi:", err instanceof Error ? err.message : "noma'lum");
+    }
     try {
       await pushOrderToBito(db, result.id);
     } catch (err) {
