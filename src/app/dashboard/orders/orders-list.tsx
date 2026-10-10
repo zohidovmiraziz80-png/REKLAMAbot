@@ -19,6 +19,7 @@ import {
 } from "@/lib/shop/format";
 import { retryOrderSyncAction, updateOrderAction } from "./actions";
 import { BtsPanel } from "./bts-panel";
+import { CourierPanel } from "./courier-panel";
 import { YandexPanel } from "./yandex-panel";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
@@ -31,7 +32,19 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
 
 const select = "rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500";
 
-export function OrdersList({ initial, emptyAll, yandex = false, bts = false }: { initial: Order[]; emptyAll: boolean; yandex?: boolean; bts?: boolean }) {
+export function OrdersList({
+  initial,
+  emptyAll,
+  yandex = false,
+  bts = false,
+  couriers = [],
+}: {
+  initial: Order[];
+  emptyAll: boolean;
+  yandex?: boolean;
+  bts?: boolean;
+  couriers?: { chatId: number; name: string }[];
+}) {
   const [orders, setOrders] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(initial[0]?.status === "new" ? initial[0].id : null);
 
@@ -67,6 +80,7 @@ export function OrdersList({ initial, emptyAll, yandex = false, bts = false }: {
           onToggle={() => setOpenId(openId === o.id ? null : o.id)}
           yandex={yandex}
           bts={bts}
+          couriers={couriers}
           onChange={(patch) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...patch } : x)))}
         />
       ))}
@@ -81,6 +95,7 @@ function OrderCard({
   onChange,
   yandex,
   bts,
+  couriers,
 }: {
   order: Order;
   open: boolean;
@@ -88,6 +103,7 @@ function OrderCard({
   onChange: (p: Partial<Order>) => void;
   yandex: boolean;
   bts: boolean;
+  couriers: { chatId: number; name: string }[];
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -271,6 +287,16 @@ function OrderCard({
                 </button>
               </div>
             ) : null}
+            {couriers.length > 0 && o.delivery_method === "courier" && o.status !== "cancelled" && o.status !== "done" && (
+              <CourierPanel
+                orderId={o.id}
+                couriers={couriers}
+                ext={o.external_ids ?? {}}
+                onAssigned={(name, chatId) =>
+                  onChange({ status: o.status === "new" || o.status === "confirmed" ? "delivering" : o.status, external_ids: { ...(o.external_ids ?? {}), courier: String(chatId), courier_name: name } })
+                }
+              />
+            )}
             {yandex && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.yandex) && (
               <YandexPanel orderId={o.id} ext={o.external_ids ?? {}} onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })} />
             )}

@@ -3,11 +3,13 @@ import Link from "next/link";
 import { runAction } from "@/actions/run";
 import { getShopSettings } from "@/actions/shop";
 import { SettingsForm } from "./settings-form";
+import { getCourierSetup } from "@/actions/couriers";
+import { Couriers } from "./couriers";
 
 export const metadata: Metadata = { title: "Do'kon sozlamalari" };
 
 export default async function ShopSettingsPage() {
-  const result = await runAction(getShopSettings, {});
+  const [result, courierSetup] = await Promise.all([runAction(getShopSettings, {}), runAction(getCourierSetup, {})]);
   if (!result.ok) return <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{result.error}</p>;
   const { settings, bots } = result.data;
 
@@ -22,6 +24,8 @@ export default async function ShopSettingsPage() {
       </div>
 
       <SettingsForm initial={settings} />
+
+      {courierSetup.ok && <Couriers setup={courierSetup.data} />}
 
       <section className="mt-6 rounded-2xl border border-line bg-white p-5">
         <h2 className="font-semibold">Buyurtmalar Telegram guruhga tushsin</h2>

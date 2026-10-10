@@ -104,10 +104,13 @@ export function orderAdminText(o: OrderRow, statusOverride?: OrderStatus) {
   return lines.filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n").slice(0, 4000);
 }
 
-export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, status: OrderStatus, opts: { yandex?: boolean } = {}) {
+export function orderAdminKeyboard(o: Pick<OrderRow, "id" | "payment_status">, status: OrderStatus, opts: { yandex?: boolean; courier?: boolean } = {}) {
   if (status === "cancelled") return { inline_keyboard: [] };
   const payRow: { text: string; callback_data: string }[][] = o.payment_status === "unpaid" ? [[{ text: "💳 To'landi deb belgilash", callback_data: `pp:${o.id}` }]] : [];
-  if (opts.yandex && status !== "done") payRow.push([{ text: "🚕 Yandex kuryer", callback_data: `yd:${o.id}` }]);
+  const extra: { text: string; callback_data: string }[] = [];
+  if (opts.courier && status !== "done") extra.push({ text: "🛵 Kuryerga berish", callback_data: `ck:${o.id}` });
+  if (opts.yandex && status !== "done") extra.push({ text: "🚕 Yandex kuryer", callback_data: `yd:${o.id}` });
+  if (extra.length) payRow.push(extra);
   if (status === "done") return { inline_keyboard: payRow };
   const btn = (s: OrderStatus, text: string) => ({ text, callback_data: `os:${o.id}:${s}` });
   const rows: { text: string; callback_data: string }[][] =
@@ -128,6 +131,13 @@ export async function hasYandex(db: SupabaseClient, workspaceId: string) {
   return data?.status === "active" && plan.integrations;
 }
 
+/** Do'konda kuryer ulanganmi (asosiy bot sozlamasida) */
+export async function hasCouriers(db: SupabaseClient, workspaceId: string) {
+  const { data } = await db.from("bots").select("config").eq("workspace_id", workspaceId).order("created_at").limit(1).maybeSingle();
+  const list = (data?.config as { couriers?: unknown[] } | null)?.couriers;
+  return Array.isArray(list) && list.length > 0;
+}
+
 /** Yangi buyurtma: bot egasiga va ulangan guruhga xabar, mijozga tasdiq */
 export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks?: string, customerExtra?: string) {
   await sendOrderSms(db, order, "new");
@@ -141,8 +151,9 @@ export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks
       .maybeSingle();
 
     const text = orderAdminText(order);
-    const yandex = order.delivery_method === "courier" && (await hasYandex(db, order.workspace_id));
-    const keyboard = orderAdminKeyboard(order, order.status, { yandex });
+    const courierOrder = order.delivery_method === "courier";
+    const yandex = courierOrder && (await hasYandex(db, order.workspace_id));
+    const keyboard = orderAdminKeyboard(order, order.status, { yandex, courier: courierOrder && (await hasCouriers(db, order.workspace_id)) });
     const sent = new Set<string>();
     const sendTo = async (bot: BotRow, chatId: number) => {
       const key = `${bot.project_id}:${chatId}`;

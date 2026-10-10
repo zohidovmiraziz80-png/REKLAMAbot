@@ -9,9 +9,10 @@ import { publicSiteUrls } from "@/lib/site/hosting";
 import { ORDER_STATUSES, ORDER_STATUS_EMOJI, ORDER_STATUS_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
 import { dispatchYandex, estimateYandex } from "@/lib/delivery/yandex-flow";
 import { YandexError } from "@/lib/delivery/yandex";
-import { hasYandex, loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
+import { hasCouriers, hasYandex, loadOrderRow, notifyCustomerStatus, orderAdminKeyboard, orderAdminText, type OrderRow } from "@/lib/shop/notify";
 import { tg } from "./api";
-import { linkCode, updateBotConfig } from "./main-bot";
+import { linkCode, loadMainBot, updateBotConfig } from "./main-bot";
+import { assignCourier, courierDelivered, CourierError } from "@/lib/couriers";
 import { withChatLink } from "./chat-link";
 import { botConfigSchema, buttonRows, safeBotUrl, safeWebAppUrl, type BotConfig } from "./config";
 
@@ -115,9 +116,22 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
   const data = cb.data ?? "";
   const pay = data.match(/^pp:([0-9a-f-]{36})$/);
   const yd = data.match(/^y([dc]):([0-9a-f-]{36})$/);
-  const m = pay || yd ? null : data.match(/^os:([0-9a-f-]{36}):(\w+)$/);
+  const cd = data.match(/^cd:([0-9a-f-]{36})$/);
+  const ck = data.match(/^ck:([0-9a-f-]{36})$/);
+  const ca = data.match(/^ca:([0-9a-f-]{36}):(-?\d{1,16})$/);
+  const m = pay || yd || cd || ck || ca ? null : data.match(/^os:([0-9a-f-]{36}):(\w+)$/);
   const chatId = cb.message?.chat.id;
-  if ((!m && !pay && !yd) || !chatId || !cb.message) return answer("");
+  if ((!m && !pay && !yd && !cd && !ck && !ca) || !chatId || !cb.message) return answer("");
+
+  // Kuryer «Yetkazdim» ni bosdi (ruxsat: aynan shu kuryer)
+  if (cd) {
+    const r = await courierDelivered(db, bot.workspace_id, cd[1], chatId);
+    if (r !== "ok") return answer(r);
+    await answer("✅ Rahmat!");
+    await tg(bot.token, "editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
+    await tg(bot.token, "sendMessage", { chat_id: chatId, text: "✅ Yetkazildi deb belgilandi." }).catch(() => undefined);
+    return;
+  }
 
   // Ruxsat: bot egasining chati yoki shu bot orqali ulangan do'kon guruhi
   let allowed = bot.owner_chat_id === chatId;
@@ -128,6 +142,31 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
   if (!allowed) return answer("Ruxsat yo'q");
 
   const who = [cb.from.first_name, cb.from.username ? `@${cb.from.username}` : ""].filter(Boolean).join(" ");
+
+  // O'z kuryerlari: ck — ro'yxatni ko'rsatish, ca — biriktirish
+  if (ck || ca) {
+    const mb = await loadMainBot(db, bot.workspace_id);
+    const list = mb?.config.couriers ?? [];
+    if (!list.length) return answer("Kuryer ulanmagan");
+    if (ck) {
+      await answer("");
+      await tg(bot.token, "sendMessage", {
+        chat_id: chatId,
+        text: "🛵 Qaysi kuryerga berilsin?",
+        reply_parameters: { message_id: cb.message.message_id, allow_sending_without_reply: true },
+        reply_markup: { inline_keyboard: list.map((c) => [{ text: c.name, callback_data: `ca:${ck[1]}:${c.chatId}` }]) },
+      }).catch(() => undefined);
+      return;
+    }
+    try {
+      const name = await assignCourier(db, bot.workspace_id, ca![1], Number(ca![2]));
+      await answer(`🛵 ${name}ga berildi`);
+      await tg(bot.token, "editMessageText", { chat_id: chatId, message_id: cb.message.message_id, text: `🛵 Kuryer: ${name} — buyurtma unga yuborildi.` }).catch(() => undefined);
+    } catch (err) {
+      await answer(err instanceof CourierError ? err.message : "Xatolik");
+    }
+    return;
+  }
 
   // Yandex kuryer: yd — narxni ko'rsatish, yc — tasdiqlab chaqirish
   if (yd) {
@@ -167,7 +206,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
       chat_id: chatId,
       message_id: cb.message.message_id,
       text: orderAdminText(fresh).slice(0, 4096),
-      reply_markup: orderAdminKeyboard(fresh, o.status, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)) }),
+      reply_markup: orderAdminKeyboard(fresh, o.status, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)), courier: o.delivery_method === "courier" && (await hasCouriers(db, bot.workspace_id)) }),
     }).catch(() => undefined);
     return;
   }
@@ -191,7 +230,7 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
     chat_id: chatId,
     message_id: cb.message.message_id,
     text: `${orderAdminText(o, current)}\n\n✏️ ${ORDER_STATUS_LABELS[current]} — ${who}`.slice(0, 4096),
-    reply_markup: orderAdminKeyboard(o, current, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)) }),
+    reply_markup: orderAdminKeyboard(o, current, { yandex: o.delivery_method === "courier" && (await hasYandex(db, bot.workspace_id)), courier: o.delivery_method === "courier" && (await hasCouriers(db, bot.workspace_id)) }),
   }).catch(() => undefined);
 }
 
@@ -330,6 +369,25 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   if (text.startsWith("/start")) {
     const payload = text.split(/\s+/)[1] ?? "";
     await setState({});
+    const courierJoin = payload.match(/^courier_([a-f0-9]{10})$/);
+    if (courierJoin) {
+      if (courierJoin[1] !== linkCode(bot.owner_link_code, "courier")) {
+        await send("❌ Havola noto'g'ri yoki eskirgan. Do'kon egasidan yangi havola so'rang.");
+        return;
+      }
+      const mb = await loadMainBot(db, bot.workspace_id);
+      if (!mb || mb.projectId !== bot.project_id) {
+        await send("❌ Bu havola do'konning asosiy boti uchun emas.");
+        return;
+      }
+      const others = mb.config.couriers.filter((c) => c.chatId !== chatId);
+      await updateBotConfig(db, bot.project_id, { couriers: [...others, { chatId, name: name ?? username ?? "Kuryer" }] });
+      await send("✅ Siz kuryer sifatida ulandingiz. Yetkazish buyurtmalari shu yerga keladi — manzil, telefon va «✅ Yetkazdim» tugmasi bilan.", { remove_keyboard: true });
+      if (bot.owner_chat_id && bot.owner_chat_id !== chatId) {
+        await tg(bot.token, "sendMessage", { chat_id: bot.owner_chat_id, text: `🛵 Yangi kuryer ulandi: ${name ?? "—"}${username ? ` (@${username})` : ""}` }).catch(() => undefined);
+      }
+      return;
+    }
     const login = payload.match(/^login_([a-f0-9]{24})$/);
     if (login) {
       await setState({ step: "login", token: login[1], startedAt: Date.now() });
