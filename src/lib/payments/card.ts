@@ -80,13 +80,30 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
     .maybeSingle();
   if (!s || s.pay_channel_chat_id !== post.chat.id || s.pay_channel_bot_project_id !== bot.project_id) return;
 
+  await matchPaymentText(db, bot, text, post.chat.id, post.message_id, { methods: ["card", "click"], notify: true });
+}
+
+/**
+ * To'lov xabari matnidan (bank SMS, Click/Payme bot xabari) mos buyurtmani topib "to'landi" qiladi.
+ * methods — qaysi to'lov usulidagi buyurtmalar orasidan summa bo'yicha qidirish.
+ * notify=false bo'lsa natija shu chatga javob qilib yoziladi (ega xabarni o'zi yuborgan holat).
+ */
+export async function matchPaymentText(
+  db: SupabaseClient,
+  bot: Bot,
+  text: string,
+  chatId: number,
+  messageId: number,
+  opts: { methods: string[]; notify: boolean },
+): Promise<"paid" | "ambiguous" | "none" | "skip"> {
   const parsed = parsePaymentSms(text);
-  if (!parsed || !parsed.incoming) return;
+  if (!parsed || !parsed.incoming) return "skip";
 
   // Bir xabarni ikki marta hisoblamaslik uchun
-  const externalId = `${post.chat.id}:${post.message_id}`;
+  const externalId = parsed.txnId ? `txn:${parsed.txnId}` : `${chatId}:${messageId}`;
   const { data: existing } = await db.from("payment_transactions").select("id").in("provider", ["card", "click"]).eq("external_id", externalId).maybeSingle();
-  if (existing) return;
+  if (existing) return "skip";
+  const logProvider = /click/i.test(text) ? "click" : "card";
 
   const since = new Date(Date.now() - MATCH_WINDOW_HOURS * 3600 * 1000).toISOString();
   type Match = { id: string; number: number; total: number; payment_method: string };
@@ -109,7 +126,7 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
       .from("orders")
       .select("id, number, total, payment_method")
       .eq("workspace_id", bot.workspace_id)
-      .in("payment_method", ["card", "click"])
+      .in("payment_method", opts.methods)
       .eq("payment_status", "unpaid")
       .neq("status", "cancelled")
       .gte("created_at", since)
@@ -126,13 +143,13 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
   }
 
   const reply = (t: string) =>
-    tg(bot.token, "sendMessage", { chat_id: post.chat.id, text: t, reply_parameters: { message_id: post.message_id, allow_sending_without_reply: true } }).catch(
+    tg(bot.token, "sendMessage", { chat_id: chatId, text: t, reply_parameters: { message_id: messageId, allow_sending_without_reply: true } }).catch(
       () => undefined,
     );
 
   if (matches.length === 1) {
     const o = matches[0];
-    const provider = o.payment_method === "click" ? "click" : "card";
+    const provider = o.payment_method === "click" || logProvider === "click" ? "click" : "card";
     await db.from("payment_transactions").insert({
       workspace_id: bot.workspace_id,
       order_id: o.id,
@@ -145,25 +162,22 @@ export async function handleChannelPost(db: SupabaseClient, bot: Bot, post: Chan
     });
     await markOrderPaid(db, o.id, provider);
     await reply(`✅ №${o.number} buyurtma to'landi deb belgilandi (${formatMoney(parsed.amount)})`);
-    return;
+    return "paid";
   }
 
   await db.from("payment_transactions").insert({
     workspace_id: bot.workspace_id,
     order_id: null,
-    provider: "card",
+    provider: logProvider,
     external_id: externalId,
     amount: parsed.amount,
     state: 1,
     raw: { text: text.slice(0, 1000) },
   });
-  if (!matches.length) {
-    await notifyOwners(db, bot.workspace_id, `💳 Kartaga ${formatMoney(parsed.amount)} tushdi, lekin shu summadagi to'lanmagan buyurtma topilmadi.`);
-  } else {
-    await notifyOwners(
-      db,
-      bot.workspace_id,
-      `💳 Kartaga ${formatMoney(parsed.amount)} tushdi. Bir nechta mos buyurtma bor: ${matches.map((m) => `№${m.number}`).join(", ")}. Qaysi biri to'langanini MIXBOT'da belgilang.`,
-    );
-  }
+  const msgNone = `💳 ${formatMoney(parsed.amount)} to'lov keldi, lekin shu summadagi to'lanmagan buyurtma topilmadi.`;
+  const msgMany = `💳 ${formatMoney(parsed.amount)} to'lov keldi. Bir nechta mos buyurtma bor: ${matches.map((m) => `№${m.number}`).join(", ")}. Qaysi biri to'langanini buyurtma xabaridagi «💳 To'landi» tugmasi bilan belgilang.`;
+  const out = matches.length ? msgMany : msgNone;
+  if (opts.notify) await notifyOwners(db, bot.workspace_id, out);
+  else await reply(out);
+  return matches.length ? "ambiguous" : "none";
 }

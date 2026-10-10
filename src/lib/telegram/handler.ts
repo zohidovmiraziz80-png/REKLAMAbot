@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { handleChannelPost } from "@/lib/payments/card";
+import { handleChannelPost, matchPaymentText } from "@/lib/payments/card";
 import { markOrderPaid } from "@/lib/payments/core";
 import { formatUzPhone, normalizeUzPhone } from "@/lib/phone";
 import { getWorkspacePlan } from "@/lib/plans";
@@ -21,7 +21,11 @@ type TgMessage = {
   chat: { id: number; type: string; title?: string };
   from?: TgUser;
   text?: string;
+  caption?: string;
   contact?: { phone_number: string; user_id?: number };
+  /** Boshqa joydan forward qilingan xabar (masalan Click bot to'lov xabari) */
+  forward_origin?: unknown;
+  forward_date?: number;
 };
 type TgCallback = {
   id: string;
@@ -161,6 +165,14 @@ async function handleCallback(db: SupabaseClient, bot: BotRuntime, cb: TgCallbac
 /** Guruhda: "/ulash KOD" — buyurtmalar shu guruhga tushadigan bo'ladi */
 async function handleGroupMessage(db: SupabaseClient, bot: BotRuntime, msg: TgMessage) {
   const text = (msg.text ?? "").trim();
+  // Do'kon guruhiga forward qilingan to'lov xabari (Click bot va h.k.)
+  if (msg.forward_origin || msg.forward_date) {
+    const { data: g } = await db.from("shop_settings").select("group_chat_id, group_bot_project_id").eq("workspace_id", bot.workspace_id).maybeSingle();
+    if (g && g.group_chat_id === msg.chat.id && g.group_bot_project_id === bot.project_id) {
+      await matchPaymentText(db, bot, (msg.text ?? msg.caption ?? "").trim(), msg.chat.id, msg.message_id, { methods: ["card", "click", "cash"], notify: false });
+    }
+    return;
+  }
   if (/^\/tolov(?:@\w+)?\b/i.test(text)) {
     await tg(bot.token, "sendMessage", {
       chat_id: msg.chat.id,
@@ -230,6 +242,13 @@ export async function handleUpdate(db: SupabaseClient, bot: BotRuntime, update: 
   const setState = async (s: ChatState) => {
     await db.from("bot_subscribers").update({ state: s }).eq("project_id", bot.project_id).eq("chat_id", chatId);
   };
+
+  // Ega to'lov xabarini (Click bot, bank SMS) botga forward qilsa — mos buyurtma "to'landi" bo'ladi
+  if (bot.owner_chat_id === chatId && (msg.forward_origin || msg.forward_date)) {
+    const r = await matchPaymentText(db, bot, (msg.text ?? msg.caption ?? "").trim(), chatId, msg.message_id, { methods: ["card", "click", "cash"], notify: false });
+    if (r === "skip") await send("Bu xabarda to'lov summasi topilmadi (yoki u allaqachon hisobga olingan).");
+    return;
+  }
 
   // "Sayt" tarifi: bot faqat mijozni tasdiqlash va buyurtma xabarlari uchun
   const plan = await getWorkspacePlan(db, bot.workspace_id);

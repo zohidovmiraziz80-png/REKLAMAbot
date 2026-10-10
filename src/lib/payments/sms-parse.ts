@@ -44,7 +44,7 @@ export function parseMoney(raw: string): number | null {
 
 const MONEY = /([+＋]?)\s*(\d{1,3}(?:[   .,']\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(uzs|sum|so['‘’`]?m|сум|сўм)?/gi;
 
-export type ParsedPayment = { amount: number; incoming: boolean; orderRef: string | null };
+export type ParsedPayment = { amount: number; incoming: boolean; orderRef: string | null; txnId: string | null };
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 /** To'lov tizimi boti xabari (Click, Payme, Multicard): "Оплата"/"To'lov" bu yerda kirimni bildiradi */
@@ -54,10 +54,13 @@ const MERCHANT_PAID = ["подтвержден", "оплата", "oplata", "to'l
 export function parsePaymentSms(rawText: string): ParsedPayment | null {
   // Buyurtma id (Click'da transaction_param sifatida ketadi) — topilsa summadan oldin ishlatiladi
   const orderRef = rawText.match(UUID_RE)?.[0]?.toLowerCase() ?? null;
+  // To'lov tizimidagi tranzaksiya raqami (Click: "🆔 5343679634") — bir to'lovni ikki marta hisoblamaslik uchun
+  const txnId = rawText.match(/(?:🆔|\bID\b|\bid:|tranzaksiya|транзакци\S*)[\s:№#]*(\d{6,20})/i)?.[1] ?? null;
   const text = rawText
     .replace(new RegExp(UUID_RE.source, "gi"), " ")
     // Telefon raqamlari (+998*****8080, +998 90 123 45 67) summa deb olinmasin
-    .replace(/\+?998[\s*\d-]{0,14}/g, " ");
+    .replace(/\+?998[\s*\d-]{0,14}/g, " ")
+    .replace(/(?:🆔|\bID\b|\bid:)[\s:№#]*\d{6,20}/gi, " ");
   const lower = text.toLowerCase();
   const merchantPaid = MERCHANT_BOT.test(lower) && MERCHANT_PAID.some((w) => lower.includes(w)) && !/qaytar|возврат|отмен|bekor/.test(lower);
   const isOut = !merchantPaid && OUTGOING.some((w) => lower.includes(w));
@@ -96,5 +99,5 @@ export function parsePaymentSms(rawText: string): ParsedPayment | null {
   if (!candidates.length) return null;
   const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
   if (best.score === 0) return null;
-  return { amount: best.amount, incoming: isIn && !isOut, orderRef };
+  return { amount: best.amount, incoming: isIn && !isOut, orderRef, txnId };
 }
