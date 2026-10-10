@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getWorkspacePlan } from "@/lib/plans";
+import { sendOrderSms } from "@/lib/sms/eskiz";
 import { decryptSecret } from "@/lib/crypto";
 import { formatUzPhone } from "@/lib/phone";
 import { tg } from "@/lib/telegram/api";
@@ -129,6 +130,7 @@ export async function hasYandex(db: SupabaseClient, workspaceId: string) {
 
 /** Yangi buyurtma: bot egasiga va ulangan guruhga xabar, mijozga tasdiq */
 export async function notifyNewOrder(db: SupabaseClient, order: OrderRow, thanks?: string, customerExtra?: string) {
+  await sendOrderSms(db, order, "new");
   try {
     const bots = await loadBots(db, order.workspace_id);
     if (!bots.length) return;
@@ -191,7 +193,12 @@ const CUSTOMER_STATUS_TEXT: Record<OrderStatus, string> = {
 };
 
 /** Holat o'zgarganda mijozga Telegram orqali xabar */
-export async function notifyCustomerStatus(db: SupabaseClient, order: Pick<OrderRow, "workspace_id" | "number" | "chat_id" | "bot_project_id">, status: OrderStatus) {
+export async function notifyCustomerStatus(
+  db: SupabaseClient,
+  order: Pick<OrderRow, "workspace_id" | "number" | "chat_id" | "bot_project_id"> & { phone?: string | null; total?: number | null },
+  status: OrderStatus,
+) {
+  if (status !== "new") await sendOrderSms(db, order, "status", status);
   if (!order.chat_id || !order.bot_project_id || status === "new") return;
   try {
     const bots = await loadBots(db, order.workspace_id);
