@@ -167,7 +167,7 @@ export const getWebsite = defineAction({
 export const createWebsiteFromTemplate = defineAction({
   name: "createWebsiteFromTemplate",
   description:
-    "Tayyor shablondan sayt yaratadi (AI'siz). Shablonlar: shop, flowers, food, services, beauty, blank. Mavjud sayt bo'lsa, u almashtiriladi",
+    "Tayyor shablondan sayt yaratadi (AI'siz). Shablon: market (marketpleys uslubi). Mavjud sayt bo'lsa, u almashtiriladi",
   requiresConfirmation: false,
   input: z.object({
     projectId: z.string().uuid(),

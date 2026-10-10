@@ -4,6 +4,7 @@ import { instagramUrl, phoneUrl, safeHref, telegramUrl } from "@/lib/site/safe";
 import type { ShopData } from "@/lib/shop/types";
 import { AccountButton } from "./account";
 import { AiChat } from "./ai-chat";
+import { MarketHeader } from "./market-header";
 import { BlockScope, E, EditProvider } from "./editable";
 import { ShopPlaceholder, ShopSection, type ShopLayout } from "./shop";
 
@@ -268,6 +269,37 @@ function BlockView({ block, basePath, anchor, shop, st }: { block: Block; basePa
           </section>
         );
       }
+      if (v === "promo") {
+        return (
+          <section id={anchor}>
+            <div className={`${container} pt-4 pb-2 sm:pt-6`}>
+              <div
+                className="relative grid min-h-[200px] items-center gap-6 overflow-hidden rounded-2xl px-6 py-8 text-white sm:min-h-[300px] sm:px-12 md:grid-cols-[1.2fr_1fr]"
+                style={{ background: "linear-gradient(120deg, var(--s-primary), color-mix(in srgb, var(--s-primary) 55%, var(--s-accent)))" }}
+              >
+                <div aria-hidden className="pointer-events-none absolute -top-16 -right-10 size-64 rounded-full bg-white/10" />
+                <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-[color:var(--s-accent)]/30" />
+                <div className="relative">
+                  <E as="h1" path="heading" value={block.heading} className="block text-2xl font-extrabold tracking-tight text-balance sm:text-4xl" />
+                  {block.subheading && <E as="p" path="subheading" value={block.subheading} multiline className="mt-3 block max-w-xl text-pretty opacity-90 sm:text-lg" />}
+                  {block.ctaText && (
+                    <a
+                      href={safeHref(block.ctaLink, basePath)}
+                      className="mt-6 inline-block rounded-xl bg-white px-6 py-2.5 font-bold text-[color:var(--s-primary)] shadow-lg transition hover:-translate-y-0.5"
+                    >
+                      <E path="ctaText" value={block.ctaText} />
+                    </a>
+                  )}
+                </div>
+                {block.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={block.image} alt="" className="relative hidden max-h-64 w-full rounded-xl object-cover md:block" />
+                )}
+              </div>
+            </div>
+          </section>
+        );
+      }
       if (v === "minimal") {
         return (
           <section id={anchor}>
@@ -318,6 +350,25 @@ function BlockView({ block, basePath, anchor, shop, st }: { block: Block; basePa
                     {it.icon && <div className="mx-auto grid size-16 place-items-center rounded-full bg-[color:var(--s-surface)] text-3xl">{it.icon}</div>}
                     <E as="h3" path={`items.${i}.title`} value={it.title} className="mt-4 block text-lg font-semibold" />
                     <E as="p" path={`items.${i}.text`} value={it.text} multiline className="mt-1.5 block text-[color:var(--s-muted)]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      }
+      if (v === "strip") {
+        return (
+          <section id={anchor}>
+            <div className={`${container} py-3`}>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {block.items.map((it, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl bg-[color:var(--s-surface)] px-4 py-3">
+                    {it.icon && <span className="text-2xl">{it.icon}</span>}
+                    <div className="min-w-0">
+                      <E as="p" path={`items.${i}.title`} value={it.title} className="block text-sm font-semibold" />
+                      <E as="p" path={`items.${i}.text`} value={it.text} className="block truncate text-xs text-[color:var(--s-muted)]" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -745,6 +796,7 @@ function SiteHeader({
   basePath,
   contactHref,
   login,
+  cartKey,
 }: {
   site: Site;
   page: SitePage;
@@ -752,6 +804,8 @@ function SiteHeader({
   contactHref?: string;
   /** Mijoz kabineti yoqilgan bo'lsa — "Bog'lanish" o'rniga "Kirish" tugmasi */
   login?: { slug: string; preview: boolean };
+  /** Savat ombori kaliti (marketpleys sarlavhasidagi savat tugmasi uchun) */
+  cartKey?: string;
 }) {
   const header = site.header;
   const showNav = header?.showNav ?? true;
@@ -790,6 +844,7 @@ function SiteHeader({
       </a>
     ) : null;
 
+  if (variant === "market") return <MarketHeader logo={logo} account={cta} cartKey={cartKey} />;
   if (variant === "centered") {
     return (
       <header className="sticky top-0 z-10 border-b border-[color:var(--s-line)] bg-[color:var(--s-bg)]/95 backdrop-blur">
@@ -918,6 +973,7 @@ export function SiteRenderer({
         basePath={basePath}
         contactHref={contactHref}
         login={shop?.settings.loginEnabled ? { slug: shop.slug, preview: !!shop.embedded || !!editing } : undefined}
+        cartKey={shop && (hasShopBlock || live) ? (shop.embedded ? `embedded:${shop.slug}` : shop.slug) : undefined}
       />
 
       <main>

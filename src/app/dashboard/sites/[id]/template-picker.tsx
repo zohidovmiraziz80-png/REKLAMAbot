@@ -19,7 +19,7 @@ export function TemplatePicker({
   aiEnabled: boolean;
 }) {
   const router = useRouter();
-  const [templateId, setTemplateId] = useState<TemplateId>("shop");
+  const [templateId, setTemplateId] = useState<TemplateId>("market");
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
 

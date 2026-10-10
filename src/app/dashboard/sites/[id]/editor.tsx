@@ -509,7 +509,7 @@ function BlockContentForm({ block, onChange, categories }: { block: Block; onCha
               onChange={(v) => set("limit", Number(v))}
             />
           </div>
-          <Segmented label="Kompyuterda ustunlar" value={block.columns ?? "4"} options={[["2", "2"], ["3", "3"], ["4", "4"]]} onChange={(v) => set("columns", v)} />
+          <Segmented label="Kompyuterda ustunlar" value={block.columns ?? "4"} options={[["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]]} onChange={(v) => set("columns", v)} />
           <Segmented label="Telefonda ustunlar" value={block.mobileColumns ?? "2"} options={[["1", "1"], ["2", "2"]]} onChange={(v) => set("mobileColumns", v)} />
           <Segmented
             label="Rasm shakli"
@@ -517,7 +517,7 @@ function BlockContentForm({ block, onChange, categories }: { block: Block; onCha
             options={[["square", "Kvadrat"], ["portrait", "Tik"], ["landscape", "Yotiq"]]}
             onChange={(v) => set("ratio", v)}
           />
-          <Segmented label="Kartochka" value={block.card ?? "border"} options={[["border", "Chegarali"], ["shadow", "Soyali"], ["flat", "Oddiy"]]} onChange={(v) => set("card", v)} />
+          <Segmented label="Kartochka" value={block.card ?? "border"} options={[["border", "Chegarali"], ["shadow", "Soyali"], ["flat", "Oddiy"], ["market", "Marketpleys"]]} onChange={(v) => set("card", v)} />
           <div className="flex flex-wrap gap-x-4 gap-y-2">
             <CheckField label="Tavsifni ko'rsatish" checked={block.showDescription ?? false} onChange={(v) => set("showDescription", v)} />
             <CheckField label="Qidiruv va kategoriyalar" checked={block.showSearch ?? true} onChange={(v) => set("showSearch", v)} />
@@ -1126,6 +1126,7 @@ export function SiteEditor({
                     ["classic", "Oddiy"],
                     ["centered", "Markazda"],
                     ["dark", "Rangli"],
+                    ["market", "Qidiruvli"],
                   ]}
                   onChange={(v) => setHeader({ variant: v })}
                 />

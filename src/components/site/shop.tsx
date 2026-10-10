@@ -59,6 +59,26 @@ function getStore(key: string): CartStore {
   }
   return s;
 }
+/** Sarlavhadagi savat tugmasi uchun: mahsulotlar soni */
+export function useCartCount(slug: string) {
+  const store = getStore(slug);
+  return useSyncExternalStore(
+    (cb) => {
+      store.listeners.add(cb);
+      return () => store.listeners.delete(cb);
+    },
+    () => Object.values(store.cart).reduce((a, b) => a + b, 0),
+    () => 0,
+  );
+}
+
+/** Savat oynasini ochish (sarlavhadan) */
+export function openCart(slug: string) {
+  const store = getStore(slug);
+  store.openRequest = Date.now();
+  notify(store);
+}
+
 function notify(s: CartStore) {
   for (const l of [...s.listeners]) l();
 }
@@ -162,9 +182,9 @@ function AddControl({ p, qty, canOrder, onChange }: { p: PublicProduct; qty: num
 export type ShopLayout = {
   category: string;
   limit: number;
-  columns: "2" | "3" | "4";
+  columns: "2" | "3" | "4" | "5";
   mobileColumns: "1" | "2";
-  card: "border" | "shadow" | "flat";
+  card: "border" | "shadow" | "flat" | "market";
   ratio: "square" | "portrait" | "landscape";
   showDescription: boolean;
   showSearch: boolean;
@@ -188,10 +208,16 @@ const CARD = {
   border: "border border-[color:var(--s-line)] hover:shadow-lg",
   shadow: "shadow-md hover:shadow-xl",
   flat: "",
+  market: "",
 } as const;
 const GRID: Record<ShopLayout["mobileColumns"], Record<ShopLayout["columns"], string>> = {
-  "1": { "2": "grid-cols-1 sm:grid-cols-2", "3": "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3", "4": "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4" },
-  "2": { "2": "grid-cols-2", "3": "grid-cols-2 lg:grid-cols-3", "4": "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" },
+  "1": {
+    "2": "grid-cols-1 sm:grid-cols-2",
+    "3": "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+    "4": "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4",
+    "5": "grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+  },
+  "2": { "2": "grid-cols-2", "3": "grid-cols-2 lg:grid-cols-3", "4": "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4", "5": "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" },
 };
 
 export function ShopSection({
@@ -231,6 +257,18 @@ export function ShopSection({
       // e'tiborsiz
     }
   }, []);
+  // Marketpleys sarlavhasidagi qidiruv maydoni
+  useEffect(() => {
+    const onSearch = (e: Event) => {
+      const v = (e as CustomEvent<string>).detail ?? "";
+      setQuery(v);
+      setCategory("");
+      setShown(48);
+      document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener("mx-shop-search", onSearch);
+    return () => window.removeEventListener("mx-shop-search", onSearch);
+  }, [anchor]);
   const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
@@ -310,7 +348,8 @@ export function ShopSection({
   const subtotal = lines.reduce((s, l) => s + l.p.price * l.qty, 0);
   const q = query.trim().toLowerCase();
   const visible = products.filter((p) => (!category || p.category === category) && (!q || p.name.toLowerCase().includes(q)));
-  const showSearch = layout.showSearch && products.length >= 6;
+  // Marketpleys kartochkasida qidiruv sarlavhada turadi
+  const showSearch = layout.showSearch && products.length >= 6 && layout.card !== "market";
   const showTools = layout.showSearch && (categories.length > 1 || products.length >= 6);
   const left = layout.align === "left";
 
@@ -394,6 +433,46 @@ export function ShopSection({
           >
             {visible.slice(0, shown).map((p) => {
               const off = discount(p);
+              if (layout.card === "market") {
+                const qty = cart[p.id] ?? 0;
+                return (
+                  <article key={p.id} className="group flex flex-col">
+                    <div className="relative overflow-hidden rounded-xl bg-[color:var(--s-surface)]">
+                      <button type="button" onClick={() => setDetail(p)} className="block w-full text-left" aria-label={p.name}>
+                        <ProductImage p={p} className={`aspect-[3/4] w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
+                      </button>
+                      {off > 0 && <span className="absolute top-2 left-2 rounded-md bg-[color:var(--s-accent)] px-1.5 py-0.5 text-[11px] font-bold text-white">−{off}%</span>}
+                      {!p.inStock && (
+                        <span className="absolute inset-x-2 bottom-2 rounded-full bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">Tugagan</span>
+                      )}
+                      {p.inStock && settings.acceptOrders && qty === 0 && (
+                        <button
+                          type="button"
+                          aria-label="Savatga qo'shish"
+                          onClick={() => update(p.id, 1)}
+                          className="absolute right-2 bottom-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl font-bold text-[color:var(--s-heading)] shadow-md transition hover:bg-[color:var(--s-accent)] hover:text-white"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col pt-2">
+                      <p className="flex flex-wrap items-baseline gap-x-1.5">
+                        <span className="text-[15px] font-extrabold text-[color:var(--s-heading)] sm:text-base">{formatMoney(p.price)}</span>
+                        {off > 0 && <span className="text-xs text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>}
+                      </p>
+                      <button type="button" onClick={() => setDetail(p)} className="mt-0.5 text-left">
+                        <h3 className="line-clamp-2 text-[13px] leading-snug text-[color:var(--s-text)] sm:text-sm">{p.name}</h3>
+                      </button>
+                      {qty > 0 && (
+                        <div className="mt-auto pt-2">
+                          <Stepper qty={qty} max={p.maxQty} onChange={(q2) => update(p.id, q2)} />
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              }
               return (
                 <article
                   key={p.id}

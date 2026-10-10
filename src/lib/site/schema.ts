@@ -110,9 +110,9 @@ export const shopBlock = z.object({
   /** Faqat shu kategoriya (bo'sh = hammasi) — har xil joyda alohida kataloglar qo'yish uchun */
   category: opt(txt(60)),
   limit: opt(z.number().int().min(0).max(48)),
-  columns: opt(z.enum(["2", "3", "4"])),
+  columns: opt(z.enum(["2", "3", "4", "5"])),
   mobileColumns: opt(z.enum(["1", "2"])),
-  card: opt(z.enum(["border", "shadow", "flat"])),
+  card: opt(z.enum(["border", "shadow", "flat", "market"])),
   ratio: opt(z.enum(["square", "portrait", "landscape"])),
   showDescription: opt(z.boolean()),
   showSearch: opt(z.boolean()),
@@ -300,7 +300,7 @@ export const siteSchema = z
         showNav: z.boolean().catch(true),
         ctaText: txt(30),
         ctaLink: txt(300),
-        variant: opt(z.enum(["classic", "centered", "dark"])),
+        variant: opt(z.enum(["classic", "centered", "dark", "market"])),
       }),
     ),
     footer: opt(
@@ -407,11 +407,13 @@ export const BLOCK_VARIANTS: Partial<Record<BlockType, { id: string; label: stri
     { id: "split", label: "Matn + rasm" },
     { id: "image", label: "Katta rasm" },
     { id: "minimal", label: "Minimal" },
+    { id: "promo", label: "Promo banner" },
   ],
   features: [
     { id: "cards", label: "Kartochkalar" },
     { id: "icons", label: "Ikonkalar" },
     { id: "list", label: "Ro'yxat" },
+    { id: "strip", label: "Ixcham qator" },
   ],
   about: [
     { id: "simple", label: "Oddiy" },
