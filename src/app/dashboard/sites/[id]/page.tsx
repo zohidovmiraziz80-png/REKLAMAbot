@@ -55,9 +55,19 @@ export default async function SiteEditorPage({
         </Link>
         <span>/</span>
         <span className="font-medium text-ink">{website.projectName}</span>
+        {website.content && mode !== "template" && (
+          <Link
+            href={`/dashboard/sites/${website.projectId}?mode=template`}
+            className="ml-auto rounded-lg border border-line bg-white px-3 py-1.5 font-medium text-ink hover:border-brand-500"
+          >
+            🎨 Shablonni almashtirish
+          </Link>
+        )}
       </div>
 
-      {website.content && publish && !publish.ok ? (
+      {website.content && mode === "template" ? (
+        <TemplatePicker projectId={website.projectId} defaultName={website.projectName} aiEnabled={aiEnabled} replacing />
+      ) : website.content && publish && !publish.ok ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{publish.error}</p>
       ) : website.content && publish?.ok ? (
         <SiteEditor

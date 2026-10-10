@@ -13,10 +13,13 @@ export function TemplatePicker({
   projectId,
   defaultName,
   aiEnabled,
+  replacing = false,
 }: {
   projectId: string;
   defaultName: string;
   aiEnabled: boolean;
+  /** Mavjud saytni yangi shablon bilan almashtirish */
+  replacing?: boolean;
 }) {
   const router = useRouter();
   const [templateId, setTemplateId] = useState<TemplateId>("market");
@@ -33,7 +36,10 @@ export function TemplatePicker({
     }
     startTransition(async () => {
       const result = await createFromTemplateAction(projectId, templateId, details);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        if (replacing) router.push(`/dashboard/sites/${projectId}`);
+        router.refresh();
+      }
       else setError(result.error);
     });
   }
@@ -41,9 +47,18 @@ export function TemplatePicker({
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-line bg-white p-6 sm:p-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Saytingizni yarating</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{replacing ? "Shablonni almashtirish" : "Saytingizni yarating"}</h1>
         <p className="mt-1 text-muted">Shablonni tanlang va asosiy ma&apos;lumotlarni kiriting. Keyin har bir matn, rang va bo&apos;limni o&apos;zingiz tahrirlaysiz.</p>
       </div>
+
+      {replacing && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
+          <span>⚠️ Yangi shablon hozirgi saytning sahifalari va matnlari o&apos;rniga qo&apos;yiladi. Mahsulotlar, buyurtmalar va sozlamalar o&apos;zgarmaydi.</span>
+          <Link href={`/dashboard/sites/${projectId}`} className="font-semibold underline">
+            Bekor qilish
+          </Link>
+        </div>
+      )}
 
       {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</p>}
 
