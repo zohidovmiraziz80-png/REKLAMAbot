@@ -116,6 +116,8 @@ export const shopBlock = z.object({
   ratio: opt(z.enum(["square", "portrait", "landscape"])),
   showDescription: opt(z.boolean()),
   showSearch: opt(z.boolean()),
+  /** Qaysi mahsulotlar: hammasi, yangi qo'shilganlar (tasodifiy tartibda) yoki chegirmadagilar */
+  source: opt(z.enum(["all", "new", "discount"])),
 });
 
 export const imageBlock = z.object({
@@ -402,6 +404,10 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
 
 /** Har blok turi uchun tayyor dizaynlar (bloklar kutubxonasi) */
 export const BLOCK_VARIANTS: Partial<Record<BlockType, { id: string; label: string }[]>> = {
+  shop: [
+    { id: "grid", label: "Katalog (to'r)" },
+    { id: "row", label: "Kategoriya qatori" },
+  ],
   hero: [
     { id: "classic", label: "Rangli fon" },
     { id: "split", label: "Matn + rasm" },

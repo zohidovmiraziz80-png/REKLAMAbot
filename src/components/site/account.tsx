@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { CUSTOMER_STATUS_LABELS, PAY_METHOD_LABELS, formatMoney, type OrderStatus } from "@/lib/shop/format";
+import { SHOP_EVENTS, shopEvent, toggleFavorite, useFavorites } from "./favorites";
 
 /**
  * Mijoz kabineti: Telegram bot orqali telefonni tasdiqlab kirish va buyurtmalar ro'yxati.
@@ -134,6 +135,23 @@ export function AccountButton({ slug, placement = "header", dark = false }: { sl
 
 function AccountModal({ slug, onClose }: { slug: string; onClose: () => void }) {
   const saved = useCustomer(slug);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [onClose]);
+  if (saved) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4" onClick={onClose}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="s-card flex h-full w-full max-w-4xl flex-col overflow-hidden bg-[color:var(--s-bg)] text-[color:var(--s-text)] sm:h-[min(88dvh,760px)] sm:rounded-2xl"
+        >
+          <Cabinet slug={slug} saved={saved} onClose={onClose} />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div
@@ -141,12 +159,12 @@ function AccountModal({ slug, onClose }: { slug: string; onClose: () => void }) 
         className="s-card max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[var(--s-radius)] bg-[color:var(--s-bg)] p-5 text-[color:var(--s-text)] sm:rounded-[var(--s-radius)]"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">{saved ? "Mening kabinetim" : "Kabinetga kirish"}</h3>
+          <h3 className="text-lg font-bold">Kabinetga kirish</h3>
           <button type="button" onClick={onClose} aria-label="Yopish" className="text-2xl leading-none text-[color:var(--s-muted)]">
             ×
           </button>
         </div>
-        {saved ? <Cabinet slug={slug} saved={saved} /> : <Login slug={slug} />}
+        <Login slug={slug} />
       </div>
     </div>
   );
@@ -273,9 +291,15 @@ function Login({ slug }: { slug: string }) {
   );
 }
 
-function Cabinet({ slug, saved }: { slug: string; saved: Saved }) {
+type Tab = "orders" | "favorites" | "profile";
+const ACTIVE: OrderStatus[] = ["new", "confirmed", "delivering"];
+
+function Cabinet({ slug, saved, onClose }: { slug: string; saved: Saved; onClose: () => void }) {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("orders");
+  const [filter, setFilter] = useState<"all" | "active" | "done" | "cancelled">("all");
+  const favs = useFavorites(slug);
 
   useEffect(() => {
     let alive = true;
@@ -293,113 +317,278 @@ function Cabinet({ slug, saved }: { slug: string; saved: Saved }) {
     };
   }, [slug, saved.session]);
 
+  const list = (orders ?? []).filter((o) =>
+    filter === "all" ? true : filter === "active" ? ACTIVE.includes(o.status) : filter === "done" ? o.status === "done" : o.status === "cancelled",
+  );
+  const tabs: [Tab, string, string, number | null][] = [
+    ["orders", "📦", "Buyurtmalarim", orders ? orders.filter((o) => ACTIVE.includes(o.status)).length || null : null],
+    ["favorites", "♡", "Saralangan", favs.length || null],
+    ["profile", "👤", "Ma'lumotlarim", null],
+  ];
+  const title = tabs.find((t) => t[0] === tab)?.[2] ?? "";
+
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex items-center gap-3 rounded-[calc(var(--s-radius)*0.6)] bg-[color:var(--s-surface)] p-3">
-        <div className="grid size-11 place-items-center rounded-full bg-[color:var(--s-accent)] text-lg font-bold text-white">
-          {(saved.customer.name || "?").slice(0, 1).toUpperCase()}
+    <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+      <aside className="shrink-0 border-b border-[color:var(--s-line)] bg-[color:var(--s-surface)] sm:w-64 sm:border-r sm:border-b-0">
+        <div className="flex items-center gap-3 p-4">
+          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[color:var(--s-primary)] text-lg font-bold text-white">
+            {(saved.customer.name || "?").slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{saved.customer.name || "Mijoz"}</p>
+            <p className="truncate text-xs text-[color:var(--s-muted)]">{saved.customer.phone}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Yopish" className="text-2xl leading-none text-[color:var(--s-muted)] sm:hidden">
+            ×
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{saved.customer.name || "Mijoz"}</p>
-          <p className="text-sm text-[color:var(--s-muted)]">{saved.customer.phone} · ✅ tasdiqlangan</p>
+        <nav className="flex gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] sm:flex-col sm:px-3">
+          {tabs.map(([id, icon, label, badge]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                tab === id ? "bg-[color:var(--s-bg)] font-semibold text-[color:var(--s-heading)] shadow-sm" : "text-[color:var(--s-muted)] hover:text-[color:var(--s-text)]"
+              }`}
+            >
+              <span className="w-5 text-center">{icon}</span>
+              <span className="flex-1 whitespace-nowrap">{label}</span>
+              {badge != null && <span className="rounded-full bg-[color:var(--s-accent)] px-1.5 text-[11px] leading-5 font-bold text-white">{badge}</span>}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => write(slug, null)}
+            className="flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-[color:var(--s-muted)] hover:text-red-600 sm:mt-2"
+          >
+            <span className="w-5 text-center">↩</span>
+            <span className="whitespace-nowrap">Chiqish</span>
+          </button>
+        </nav>
+      </aside>
+
+      <section className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
+          <h3 className="text-xl font-bold text-[color:var(--s-heading)]">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Yopish" className="hidden text-2xl leading-none text-[color:var(--s-muted)] sm:block">
+            ×
+          </button>
         </div>
-        <button type="button" onClick={() => write(slug, null)} className="text-sm text-[color:var(--s-muted)] underline">
-          Chiqish
-        </button>
-      </div>
-
-      <div>
-        <h4 className="mb-2 font-semibold">Buyurtmalarim</h4>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {!orders && !error && <p className="text-sm text-[color:var(--s-muted)]">Yuklanmoqda…</p>}
-        {orders && orders.length === 0 && <p className="text-sm text-[color:var(--s-muted)]">Hali buyurtma yo&apos;q.</p>}
-        <ul className="space-y-2">
-          {orders?.map((o) => (
-            <li key={o.id} className="rounded-[calc(var(--s-radius)*0.6)] border border-[color:var(--s-line)] p-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <b>Buyurtma №{o.number}</b>
-                <span className="text-xs text-[color:var(--s-muted)]">{dateOf(o.created_at)}</span>
-              </div>
-              <p className="mt-1 text-sm font-medium">{CUSTOMER_STATUS_LABELS[o.status] ?? o.status}</p>
-              <div className="mt-2">
-                <Progress status={o.status} pickup={o.delivery_method === "pickup"} />
-              </div>
-
-              <ul className="mt-3 space-y-1.5">
-                {(o.items ?? []).slice(0, 8).map((i, idx) => (
-                  <li key={idx} className="flex items-center gap-2.5">
-                    {i.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={i.image_url} alt="" loading="lazy" className="size-11 shrink-0 rounded-lg object-cover" />
-                    ) : (
-                      <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--s-surface)] text-lg">{i.emoji || "📦"}</span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{i.name}</span>
-                      {i.price != null && (
-                        <span className="text-xs text-[color:var(--s-muted)]">
-                          {i.qty} × {formatMoney(i.price)}
-                        </span>
-                      )}
-                    </span>
-                    {i.price != null && <span className="shrink-0 text-xs font-medium">{formatMoney(i.price * i.qty)}</span>}
-                  </li>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
+          {tab === "orders" && (
+            <>
+              <div className="flex gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none]">
+                {(
+                  [
+                    ["all", "Hammasi"],
+                    ["active", "Faol"],
+                    ["done", "Yetkazilgan"],
+                    ["cancelled", "Bekor qilingan"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFilter(id)}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap ${
+                      filter === id ? "bg-[color:var(--s-primary)] font-semibold text-white" : "border border-[color:var(--s-line)] text-[color:var(--s-text)]"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
-                {(o.items ?? []).length > 8 && <li className="text-xs text-[color:var(--s-muted)]">yana {(o.items ?? []).length - 8} ta…</li>}
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              {!orders && !error && <p className="text-sm text-[color:var(--s-muted)]">Yuklanmoqda…</p>}
+              {orders && list.length === 0 && (
+                <div className="mt-8 text-center">
+                  <p className="text-4xl">📦</p>
+                  <p className="mt-2 text-sm text-[color:var(--s-muted)]">{orders.length === 0 ? "Hali buyurtma yo'q." : "Bu bo'limda buyurtma yo'q."}</p>
+                </div>
+              )}
+              <ul className="space-y-3">
+                {list.map((o) => (
+                  <OrderCard key={o.id} o={o} />
+                ))}
               </ul>
+            </>
+          )}
 
-              <dl className="mt-3 space-y-1 border-t border-[color:var(--s-line)] pt-2 text-xs">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-[color:var(--s-muted)]">Qabul qilish</dt>
-                  <dd className="text-right">{o.delivery_method === "courier" ? `🚚 Yetkazib berish${o.address ? `: ${o.address}` : ""}` : "🏪 Olib ketish"}</dd>
+          {tab === "favorites" &&
+            (favs.length === 0 ? (
+              <div className="mt-8 text-center">
+                <p className="text-4xl">♡</p>
+                <p className="mt-2 text-sm text-[color:var(--s-muted)]">Yoqqan mahsulotlardagi ♡ belgisini bosing — ular shu yerda saqlanadi.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {favs.map((f) => (
+                    <div key={f.id} className="relative">
+                      {f.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={f.imageUrl} alt={f.name} loading="lazy" className="aspect-[3/4] w-full rounded-xl object-cover" />
+                      ) : (
+                        <div className="grid aspect-[3/4] w-full place-items-center rounded-xl bg-[color:var(--s-surface)] text-5xl">{f.emoji || "📦"}</div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleFavorite(slug, f)}
+                        aria-label="Saralangandan olib tashlash"
+                        className="absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-full bg-white/90 text-[color:var(--s-accent)]"
+                      >
+                        ♥
+                      </button>
+                      <p className="mt-1.5 text-sm font-bold">{formatMoney(f.price)}</p>
+                      <p className="line-clamp-2 text-xs text-[color:var(--s-muted)]">{f.name}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-[color:var(--s-muted)]">To&apos;lov</dt>
-                  <dd className="text-right">
-                    {PAY_METHOD_LABELS[o.payment_method] ?? o.payment_method} ·{" "}
-                    <span className={o.payment_status === "paid" ? "text-emerald-700" : o.payment_status === "refunded" ? "" : "text-amber-700"}>
-                      {o.payment_status === "paid" ? "✅ to'langan" : o.payment_status === "refunded" ? "qaytarilgan" : "⏳ to'lanmagan"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    shopEvent(SHOP_EVENTS.favorites);
+                  }}
+                  className={`${btnAccent} mt-5 w-full py-3`}
+                >
+                  Katalogda ko&apos;rish va savatga qo&apos;shish
+                </button>
+              </>
+            ))}
+
+          {tab === "profile" && (
+            <div className="max-w-md space-y-3">
+              {[
+                ["Ism", saved.customer.name || "—"],
+                ["Telefon", saved.customer.phone],
+                ["Tasdiqlash", "✅ Telegram orqali tasdiqlangan"],
+              ].map(([k, v]) => (
+                <div key={k} className="rounded-xl border border-[color:var(--s-line)] px-4 py-3">
+                  <p className="text-xs text-[color:var(--s-muted)]">{k}</p>
+                  <p className="mt-0.5 font-medium">{v}</p>
+                </div>
+              ))}
+              <p className="text-xs text-[color:var(--s-muted)]">Buyurtma holati o&apos;zgarganda Telegram&apos;da xabar olasiz.</p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OrderCard({ o }: { o: Order }) {
+  const [open, setOpen] = useState(false);
+  const items = o.items ?? [];
+  const status = o.status === "cancelled" ? "bg-red-50 text-red-700" : o.status === "done" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800";
+  return (
+    <li className="overflow-hidden rounded-2xl border border-[color:var(--s-line)] text-sm">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="block w-full p-4 text-left" aria-expanded={open}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-bold">Buyurtma №{o.number}</p>
+            <p className="text-xs text-[color:var(--s-muted)]">{dateOf(o.created_at)}</p>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status}`}>{CUSTOMER_STATUS_LABELS[o.status] ?? o.status}</span>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {items.slice(0, 5).map((i, idx) =>
+            i.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={idx} src={i.image_url} alt="" loading="lazy" className="size-12 shrink-0 rounded-lg object-cover" />
+            ) : (
+              <span key={idx} className="grid size-12 shrink-0 place-items-center rounded-lg bg-[color:var(--s-surface)] text-lg">
+                {i.emoji || "📦"}
+              </span>
+            ),
+          )}
+          {items.length > 5 && <span className="text-xs text-[color:var(--s-muted)]">+{items.length - 5}</span>}
+          <span className="ml-auto text-right">
+            <span className="block text-base font-extrabold">{formatMoney(o.total)}</span>
+            <span className="text-xs text-[color:var(--s-accent)]">{open ? "Yopish ▲" : "Batafsil ▼"}</span>
+          </span>
+        </div>
+        <div className="mt-3">
+          <Progress status={o.status} pickup={o.delivery_method === "pickup"} />
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-[color:var(--s-line)] px-4 pb-4">
+              <ul className="mt-3 space-y-1.5">
+            {(o.items ?? []).slice(0, 8).map((i, idx) => (
+              <li key={idx} className="flex items-center gap-2.5">
+                {i.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={i.image_url} alt="" loading="lazy" className="size-11 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--s-surface)] text-lg">{i.emoji || "📦"}</span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{i.name}</span>
+                  {i.price != null && (
+                    <span className="text-xs text-[color:var(--s-muted)]">
+                      {i.qty} × {formatMoney(i.price)}
                     </span>
-                  </dd>
+                  )}
+                </span>
+                {i.price != null && <span className="shrink-0 text-xs font-medium">{formatMoney(i.price * i.qty)}</span>}
+              </li>
+            ))}
+            {(o.items ?? []).length > 8 && <li className="text-xs text-[color:var(--s-muted)]">yana {(o.items ?? []).length - 8} ta…</li>}
+          </ul>
+
+          <dl className="mt-3 space-y-1 border-t border-[color:var(--s-line)] pt-2 text-xs">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[color:var(--s-muted)]">Qabul qilish</dt>
+              <dd className="text-right">{o.delivery_method === "courier" ? `🚚 Yetkazib berish${o.address ? `: ${o.address}` : ""}` : "🏪 Olib ketish"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[color:var(--s-muted)]">To&apos;lov</dt>
+              <dd className="text-right">
+                {PAY_METHOD_LABELS[o.payment_method] ?? o.payment_method} ·{" "}
+                <span className={o.payment_status === "paid" ? "text-emerald-700" : o.payment_status === "refunded" ? "" : "text-amber-700"}>
+                  {o.payment_status === "paid" ? "✅ to'langan" : o.payment_status === "refunded" ? "qaytarilgan" : "⏳ to'lanmagan"}
+                </span>
+              </dd>
+            </div>
+            {o.comment && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-[color:var(--s-muted)]">Izoh</dt>
+                <dd className="text-right">{o.comment}</dd>
+              </div>
+            )}
+            {o.subtotal != null && (o.delivery_price || o.discount) ? (
+              <>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[color:var(--s-muted)]">Mahsulotlar</dt>
+                  <dd>{formatMoney(o.subtotal)}</dd>
                 </div>
-                {o.comment && (
+                {!!o.delivery_price && (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-[color:var(--s-muted)]">Izoh</dt>
-                    <dd className="text-right">{o.comment}</dd>
+                    <dt className="text-[color:var(--s-muted)]">Yetkazish</dt>
+                    <dd>{formatMoney(o.delivery_price)}</dd>
                   </div>
                 )}
-                {o.subtotal != null && (o.delivery_price || o.discount) ? (
-                  <>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-[color:var(--s-muted)]">Mahsulotlar</dt>
-                      <dd>{formatMoney(o.subtotal)}</dd>
-                    </div>
-                    {!!o.delivery_price && (
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-[color:var(--s-muted)]">Yetkazish</dt>
-                        <dd>{formatMoney(o.delivery_price)}</dd>
-                      </div>
-                    )}
-                    {!!o.discount && (
-                      <div className="flex justify-between gap-3 text-emerald-700">
-                        <dt>Chegirma</dt>
-                        <dd>−{formatMoney(o.discount)}</dd>
-                      </div>
-                    )}
-                  </>
-                ) : null}
-                <div className="flex justify-between gap-3 pt-1 text-sm font-bold">
-                  <dt>Jami</dt>
-                  <dd>{formatMoney(o.total)}</dd>
-                </div>
-              </dl>
-              {o.payment_method === "card" && o.payment_status === "unpaid" && o.pay_amount && o.status !== "cancelled" && (
-                <p className="mt-2 rounded-lg bg-[color:var(--s-surface)] px-2 py-1.5 text-xs">💳 O&apos;tkazish kerak: aynan {formatMoney(o.pay_amount)}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+                {!!o.discount && (
+                  <div className="flex justify-between gap-3 text-emerald-700">
+                    <dt>Chegirma</dt>
+                    <dd>−{formatMoney(o.discount)}</dd>
+                  </div>
+                )}
+              </>
+            ) : null}
+            <div className="flex justify-between gap-3 pt-1 text-sm font-bold">
+              <dt>Jami</dt>
+              <dd>{formatMoney(o.total)}</dd>
+            </div>
+          </dl>
+          {o.payment_method === "card" && o.payment_status === "unpaid" && o.pay_amount && o.status !== "cancelled" && (
+            <p className="mt-2 rounded-lg bg-[color:var(--s-surface)] px-2 py-1.5 text-xs">💳 O&apos;tkazish kerak: aynan {formatMoney(o.pay_amount)}</p>
+          )}
+        </div>
+      )}
+    </li>
   );
 }

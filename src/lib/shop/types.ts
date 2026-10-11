@@ -11,6 +11,8 @@ export type PublicProduct = {
   emoji: string;
   inStock: boolean;
   maxQty: number;
+  /** Qo'shilgan vaqt (ISO) — "Yangiliklar" qatori uchun */
+  createdAt?: string;
 };
 
 export type PublicShopSettings = {

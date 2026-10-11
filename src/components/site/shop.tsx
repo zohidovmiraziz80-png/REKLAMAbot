@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } fro
 import { formatMoney } from "@/lib/shop/format";
 import type { PublicProduct, ShopData } from "@/lib/shop/types";
 import { useCustomer } from "./account";
+import { SHOP_EVENTS, shopEvent, toggleFavorite, useFavorites } from "./favorites";
 
 /**
  * Saytdagi jonli do'kon: katalog, savat va buyurtma berish.
@@ -189,6 +190,10 @@ export type ShopLayout = {
   showDescription: boolean;
   showSearch: boolean;
   align: "left" | "center";
+  /** Qaysi mahsulotlar: hammasi / yangilari (tasodifiy) / chegirmadagilar */
+  source?: "all" | "new" | "discount";
+  /** Gorizontal (aylantiriladigan) kategoriya qatori */
+  row?: boolean;
 };
 
 const DEFAULT_LAYOUT: ShopLayout = {
@@ -201,7 +206,96 @@ const DEFAULT_LAYOUT: ShopLayout = {
   showDescription: false,
   showSearch: true,
   align: "center",
+  source: "all",
+  row: false,
 };
+
+/** "Yangi" belgisi: oxirgi 14 kunda qo'shilgan */
+function isFresh(p: PublicProduct) {
+  if (!p.createdAt) return false;
+  const t = Date.parse(p.createdAt);
+  return Number.isFinite(t) && Date.now() - t < 14 * 864e5;
+}
+
+function Heart({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`size-5 ${on ? "fill-[color:var(--s-accent)] stroke-[color:var(--s-accent)]" : "fill-none stroke-current"}`} strokeWidth={1.9} aria-hidden>
+      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Marketpleys uslubidagi mahsulot kartochkasi */
+function MarketCard({
+  p,
+  qty,
+  canOrder,
+  fav,
+  badgeNew,
+  onQty,
+  onOpen,
+  onFav,
+  className = "",
+}: {
+  p: PublicProduct;
+  qty: number;
+  canOrder: boolean;
+  fav: boolean;
+  badgeNew: boolean;
+  onQty: (q: number) => void;
+  onOpen: () => void;
+  onFav: () => void;
+  className?: string;
+}) {
+  const off = discount(p);
+  return (
+    <article className={`group flex flex-col ${className}`}>
+      <div className="relative overflow-hidden rounded-xl bg-[color:var(--s-surface)]">
+        <button type="button" onClick={onOpen} className="block w-full text-left" aria-label={p.name}>
+          <ProductImage p={p} className={`aspect-[3/4] w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
+        </button>
+        <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+          {badgeNew && <span className="rounded-md bg-[color:var(--s-primary)] px-1.5 py-0.5 text-[11px] font-bold text-white">Yangi</span>}
+          {off > 0 && <span className="rounded-md bg-[color:var(--s-accent)] px-1.5 py-0.5 text-[11px] font-bold text-white">−{off}%</span>}
+        </div>
+        <button
+          type="button"
+          onClick={onFav}
+          aria-label={fav ? "Saralangandan olib tashlash" : "Saralanganga qo'shish"}
+          aria-pressed={fav}
+          className="absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-full bg-white/85 text-[color:var(--s-heading)] backdrop-blur transition hover:bg-white"
+        >
+          <Heart on={fav} />
+        </button>
+        {!p.inStock && <span className="absolute inset-x-2 bottom-2 rounded-full bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">Tugagan</span>}
+        {p.inStock && canOrder && qty === 0 && (
+          <button
+            type="button"
+            aria-label="Savatga qo'shish"
+            onClick={() => onQty(1)}
+            className="absolute right-2 bottom-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl font-bold text-[color:var(--s-heading)] shadow-md transition hover:bg-[color:var(--s-accent)] hover:text-white"
+          >
+            +
+          </button>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col pt-2">
+        <p className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-[15px] font-extrabold text-[color:var(--s-heading)] sm:text-base">{formatMoney(p.price)}</span>
+          {off > 0 && <span className="text-xs text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>}
+        </p>
+        <button type="button" onClick={onOpen} className="mt-0.5 text-left">
+          <h3 className="line-clamp-2 text-[13px] leading-snug text-[color:var(--s-text)] sm:text-sm">{p.name}</h3>
+        </button>
+        {qty > 0 && (
+          <div className="mt-auto pt-2">
+            <Stepper qty={qty} max={p.maxQty} onChange={onQty} />
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
 
 const RATIO = { square: "aspect-square", portrait: "aspect-[4/5]", landscape: "aspect-[4/3]" } as const;
 const CARD = {
@@ -241,10 +335,33 @@ export function ShopSection({
   const layout = layoutProp ?? DEFAULT_LAYOUT;
   const settings = shop.settings;
   // Blok faqat bitta kategoriyani ko'rsatishi mumkin (masalan "Atirgullar" bo'limi)
+  const source = layout.source ?? "all";
+  // "Yangiliklar": eng yangi mahsulotlar, sahifa ochilganda tasodifiy tartibda
+  const [seed, setSeed] = useState(0);
+  useEffect(() => {
+    if (source === "new") setSeed(Math.floor(Math.random() * 1e9) + 1);
+  }, [source]);
   const products = useMemo(() => {
-    const list = layout.category ? shop.products.filter((p) => p.category === layout.category) : shop.products;
+    let list = layout.category ? shop.products.filter((p) => p.category === layout.category) : shop.products;
+    if (source === "discount") list = list.filter((p) => discount(p) > 0);
+    if (source === "new") {
+      const newest = [...list].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")).slice(0, Math.max(layout.limit || 0, 20));
+      if (seed) {
+        let x = seed;
+        const rnd = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648);
+        for (let i = newest.length - 1; i > 0; i--) {
+          const j = Math.floor(rnd() * (i + 1));
+          [newest[i], newest[j]] = [newest[j], newest[i]];
+        }
+      }
+      list = newest;
+    }
     return layout.limit > 0 ? list.slice(0, layout.limit) : list;
-  }, [shop.products, layout.category, layout.limit]);
+  }, [shop.products, layout.category, layout.limit, source, seed]);
+  const favs = useFavorites(shop.slug);
+  const favIds = useMemo(() => new Set(favs.map((f) => f.id)), [favs]);
+  const [favOnly, setFavOnly] = useState(false);
+  const fav = (p: PublicProduct) => toggleFavorite(shop.slug, { id: p.id, name: p.name, price: p.price, imageUrl: p.imageUrl, emoji: p.emoji });
   const [category, setCategory] = useState<string>("");
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(48);
@@ -257,18 +374,41 @@ export function ShopSection({
       // e'tiborsiz
     }
   }, []);
-  // Marketpleys sarlavhasidagi qidiruv maydoni
+  // Sarlavhadagi qidiruv, kategoriya va "Saralangan" tugmalari — faqat asosiy katalog (to'r) javob beradi
+  const listens = !layout.row && source === "all" && !layout.category;
   useEffect(() => {
+    if (!listens) return;
+    const go = () => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
     const onSearch = (e: Event) => {
-      const v = (e as CustomEvent<string>).detail ?? "";
-      setQuery(v);
+      setQuery((e as CustomEvent<string>).detail ?? "");
       setCategory("");
+      setFavOnly(false);
       setShown(48);
-      document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      go();
     };
-    window.addEventListener("mx-shop-search", onSearch);
-    return () => window.removeEventListener("mx-shop-search", onSearch);
-  }, [anchor]);
+    const onCategory = (e: Event) => {
+      setCategory((e as CustomEvent<string>).detail ?? "");
+      setQuery("");
+      setFavOnly(false);
+      setShown(48);
+      go();
+    };
+    const onFav = () => {
+      setFavOnly(true);
+      setCategory("");
+      setQuery("");
+      go();
+    };
+    window.addEventListener(SHOP_EVENTS.search, onSearch);
+    window.addEventListener(SHOP_EVENTS.category, onCategory);
+    window.addEventListener(SHOP_EVENTS.favorites, onFav);
+    return () => {
+      window.removeEventListener(SHOP_EVENTS.search, onSearch);
+      window.removeEventListener(SHOP_EVENTS.category, onCategory);
+      window.removeEventListener(SHOP_EVENTS.favorites, onFav);
+    };
+  }, [anchor, listens]);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [detail, setDetail] = useState<PublicProduct | null>(null);
   const [open, setOpen] = useState<null | "cart" | "checkout" | "done">(null);
   const [inTelegram, setInTelegram] = useState(false);
@@ -347,7 +487,7 @@ export function ShopSection({
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const subtotal = lines.reduce((s, l) => s + l.p.price * l.qty, 0);
   const q = query.trim().toLowerCase();
-  const visible = products.filter((p) => (!category || p.category === category) && (!q || p.name.toLowerCase().includes(q)));
+  const visible = products.filter((p) => (!favOnly || favIds.has(p.id)) && (!category || p.category === category) && (!q || p.name.toLowerCase().includes(q)));
   // Marketpleys kartochkasida qidiruv sarlavhada turadi
   const showSearch = layout.showSearch && products.length >= 6 && layout.card !== "market";
   const showTools = layout.showSearch && (categories.length > 1 || products.length >= 6);
@@ -366,8 +506,73 @@ export function ShopSection({
   }
 
   return (
-    <section id={anchor} className="scroll-mt-16 py-12 sm:py-16">
+    <section id={anchor} className={`scroll-mt-[var(--s-sticky,4rem)] ${layout.row ? (products.length ? "py-4 sm:py-6" : "") : "py-12 sm:py-16"}`}>
       {!shop.embedded && <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={onTelegramLoad} />}
+      {layout.row ? (
+        products.length > 0 && (
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-5">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                {heading && <h2 className="truncate text-xl font-bold tracking-tight text-[color:var(--s-heading)] sm:text-2xl">{headingNode ?? heading}</h2>}
+                {subheading && <p className="mt-0.5 truncate text-sm text-[color:var(--s-muted)]">{subheadingNode ?? subheading}</p>}
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {layout.category && (
+                  <button
+                    type="button"
+                    onClick={() => shopEvent(SHOP_EVENTS.category, layout.category)}
+                    className="rounded-lg px-2 py-1 text-sm font-semibold text-[color:var(--s-accent)] hover:bg-[color:var(--s-surface)]"
+                  >
+                    Barchasi ›
+                  </button>
+                )}
+                {(["‹", "›"] as const).map((arrow, i) => (
+                  <button
+                    key={arrow}
+                    type="button"
+                    aria-label={i ? "Keyingi" : "Oldingi"}
+                    onClick={() => rowRef.current?.scrollBy({ left: (i ? 1 : -1) * (rowRef.current.clientWidth * 0.8), behavior: "smooth" })}
+                    className="hidden size-8 place-items-center rounded-full border border-[color:var(--s-line)] text-lg hover:border-[color:var(--s-accent)] sm:grid"
+                  >
+                    {arrow}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div ref={rowRef} className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto scroll-smooth px-4 pb-2 [scrollbar-width:none] sm:-mx-5 sm:gap-4 sm:px-5">
+              {products.map((p) =>
+                layout.card === "market" ? (
+                  <MarketCard
+                    key={p.id}
+                    className="w-[44%] shrink-0 snap-start sm:w-[30%] lg:w-[18.5%]"
+                    p={p}
+                    qty={cart[p.id] ?? 0}
+                    canOrder={settings.acceptOrders}
+                    fav={favIds.has(p.id)}
+                    badgeNew={source === "new" || isFresh(p)}
+                    onQty={(q2) => update(p.id, q2)}
+                    onOpen={() => setDetail(p)}
+                    onFav={() => fav(p)}
+                  />
+                ) : (
+                  <article key={p.id} className={`s-card flex w-[44%] shrink-0 snap-start flex-col overflow-hidden rounded-[var(--s-radius)] bg-[color:var(--s-bg)] sm:w-[30%] lg:w-[23%] ${CARD[layout.card]}`}>
+                    <button type="button" onClick={() => setDetail(p)} className="relative block text-left" aria-label={p.name}>
+                      <ProductImage p={p} className={`${RATIO[layout.ratio]} w-full`} />
+                    </button>
+                    <div className="flex flex-1 flex-col p-3">
+                      <h3 className="line-clamp-2 text-sm leading-snug font-semibold">{p.name}</h3>
+                      <p className="mt-auto pt-2 font-extrabold text-[color:var(--s-heading)]">{formatMoney(p.price)}</p>
+                      <div className="mt-2">
+                        <AddControl p={p} qty={cart[p.id] ?? 0} canOrder={settings.acceptOrders} onChange={(q2) => update(p.id, q2)} />
+                      </div>
+                    </div>
+                  </article>
+                ),
+              )}
+            </div>
+          </div>
+        )
+      ) : (
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-5">
         {(heading || subheading) && (
           <div className={left ? "" : "text-center"}>
@@ -389,7 +594,7 @@ export function ShopSection({
         )}
 
         {showTools && (
-          <div className="sticky top-16 z-[5] -mx-4 mt-6 space-y-2 bg-[color:var(--s-bg)]/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
+          <div className="sticky top-[var(--s-sticky,4rem)] z-[5] -mx-4 mt-6 space-y-2 bg-[color:var(--s-bg)]/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
             {showSearch && (
               <input
                 value={query}
@@ -421,7 +626,19 @@ export function ShopSection({
           </div>
         )}
 
-        {products.length === 0 ? (
+        {favOnly && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[color:var(--s-surface)] px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 font-semibold">
+              <Heart on /> Saralanganlar ({favIds.size})
+            </span>
+            <button type="button" onClick={() => setFavOnly(false)} className="font-semibold text-[color:var(--s-accent)]">
+              Hammasini ko&apos;rsatish
+            </button>
+          </div>
+        )}
+        {favOnly && visible.length === 0 ? (
+          <p className="mt-10 text-center text-[color:var(--s-muted)]">Hali hech narsa saralanmagan. Mahsulotdagi ♡ belgisini bosing.</p>
+        ) : products.length === 0 ? (
           <p className="mt-10 text-center text-[color:var(--s-muted)]">Mahsulotlar tez orada qo&apos;shiladi.</p>
         ) : visible.length === 0 ? (
           <p className="mt-10 text-center text-[color:var(--s-muted)]">Hech narsa topilmadi</p>
@@ -434,43 +651,18 @@ export function ShopSection({
             {visible.slice(0, shown).map((p) => {
               const off = discount(p);
               if (layout.card === "market") {
-                const qty = cart[p.id] ?? 0;
                 return (
-                  <article key={p.id} className="group flex flex-col">
-                    <div className="relative overflow-hidden rounded-xl bg-[color:var(--s-surface)]">
-                      <button type="button" onClick={() => setDetail(p)} className="block w-full text-left" aria-label={p.name}>
-                        <ProductImage p={p} className={`aspect-[3/4] w-full transition duration-300 group-hover:scale-[1.03] ${p.inStock ? "" : "opacity-50 grayscale"}`} />
-                      </button>
-                      {off > 0 && <span className="absolute top-2 left-2 rounded-md bg-[color:var(--s-accent)] px-1.5 py-0.5 text-[11px] font-bold text-white">−{off}%</span>}
-                      {!p.inStock && (
-                        <span className="absolute inset-x-2 bottom-2 rounded-full bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">Tugagan</span>
-                      )}
-                      {p.inStock && settings.acceptOrders && qty === 0 && (
-                        <button
-                          type="button"
-                          aria-label="Savatga qo'shish"
-                          onClick={() => update(p.id, 1)}
-                          className="absolute right-2 bottom-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl font-bold text-[color:var(--s-heading)] shadow-md transition hover:bg-[color:var(--s-accent)] hover:text-white"
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-1 flex-col pt-2">
-                      <p className="flex flex-wrap items-baseline gap-x-1.5">
-                        <span className="text-[15px] font-extrabold text-[color:var(--s-heading)] sm:text-base">{formatMoney(p.price)}</span>
-                        {off > 0 && <span className="text-xs text-[color:var(--s-muted)] line-through">{formatMoney(p.oldPrice)}</span>}
-                      </p>
-                      <button type="button" onClick={() => setDetail(p)} className="mt-0.5 text-left">
-                        <h3 className="line-clamp-2 text-[13px] leading-snug text-[color:var(--s-text)] sm:text-sm">{p.name}</h3>
-                      </button>
-                      {qty > 0 && (
-                        <div className="mt-auto pt-2">
-                          <Stepper qty={qty} max={p.maxQty} onChange={(q2) => update(p.id, q2)} />
-                        </div>
-                      )}
-                    </div>
-                  </article>
+                  <MarketCard
+                    key={p.id}
+                    p={p}
+                    qty={cart[p.id] ?? 0}
+                    canOrder={settings.acceptOrders}
+                    fav={favIds.has(p.id)}
+                    badgeNew={source === "new" || isFresh(p)}
+                    onQty={(q2) => update(p.id, q2)}
+                    onOpen={() => setDetail(p)}
+                    onFav={() => fav(p)}
+                  />
                 );
               }
               return (
@@ -519,6 +711,7 @@ export function ShopSection({
           </div>
         )}
       </div>
+      )}
 
       {detail && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setDetail(null)}>

@@ -137,6 +137,12 @@ function anchorFor(block: Block, firstOfType: boolean) {
   return block.id;
 }
 
+function categoryCounts(shop: ShopData) {
+  const m = new Map<string, number>();
+  for (const p of shop.products) if (p.category) m.set(p.category, (m.get(p.category) ?? 0) + 1);
+  return [...m].map(([name, count]) => ({ name, count }));
+}
+
 function shopLayout(block: Extract<Block, { type: "shop" }>): ShopLayout {
   return {
     category: block.category ?? "",
@@ -148,6 +154,8 @@ function shopLayout(block: Extract<Block, { type: "shop" }>): ShopLayout {
     showDescription: block.showDescription ?? false,
     showSearch: block.showSearch ?? true,
     align: block.style?.align ?? "center",
+    source: block.source ?? "all",
+    row: block.variant === "row",
   };
 }
 
@@ -797,6 +805,7 @@ function SiteHeader({
   contactHref,
   login,
   cartKey,
+  market,
 }: {
   site: Site;
   page: SitePage;
@@ -806,6 +815,8 @@ function SiteHeader({
   login?: { slug: string; preview: boolean };
   /** Savat ombori kaliti (marketpleys sarlavhasidagi savat tugmasi uchun) */
   cartKey?: string;
+  /** Marketpleys sarlavhasi uchun: do'kon va kategoriyalar */
+  market?: { shopSlug: string; categories: { name: string; count: number }[] };
 }) {
   const header = site.header;
   const showNav = header?.showNav ?? true;
@@ -844,7 +855,8 @@ function SiteHeader({
       </a>
     ) : null;
 
-  if (variant === "market") return <MarketHeader logo={logo} account={cta} cartKey={cartKey} />;
+  if (variant === "market")
+    return <MarketHeader logo={logo} account={cta} cartKey={cartKey} shopSlug={market?.shopSlug} categories={market?.categories} />;
   if (variant === "centered") {
     return (
       <header className="sticky top-0 z-10 border-b border-[color:var(--s-line)] bg-[color:var(--s-bg)]/95 backdrop-blur">
@@ -965,7 +977,11 @@ export function SiteRenderer({
   const contactHref = contact ? (page.blocks.includes(contact) ? "#aloqa" : `${basePath}/${site.pages.find((p) => p.blocks.includes(contact))?.slug}#aloqa`) : undefined;
 
   const body = (
-    <div style={themeVars(site)} className="min-h-full" data-site-root>
+    <div
+      style={{ ...themeVars(site), ...(site.header?.variant === "market" ? { ["--s-sticky" as string]: "6.75rem" } : {}) }}
+      className="min-h-full"
+      data-site-root
+    >
       <style>{BASE_CSS}</style>
       <SiteHeader
         site={site}
@@ -974,6 +990,7 @@ export function SiteRenderer({
         contactHref={contactHref}
         login={shop?.settings.loginEnabled ? { slug: shop.slug, preview: !!shop.embedded || !!editing } : undefined}
         cartKey={shop && (hasShopBlock || live) ? (shop.embedded ? `embedded:${shop.slug}` : shop.slug) : undefined}
+        market={shop && site.header?.variant === "market" ? { shopSlug: shop.slug, categories: categoryCounts(shop) } : undefined}
       />
 
       <main>

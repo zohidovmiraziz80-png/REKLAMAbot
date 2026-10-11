@@ -509,6 +509,12 @@ function BlockContentForm({ block, onChange, categories }: { block: Block; onCha
               onChange={(v) => set("limit", Number(v))}
             />
           </div>
+          <Segmented
+            label="Tartib"
+            value={block.source ?? "all"}
+            options={[["all", "Oddiy"], ["new", "Yangiliklar (tasodifiy)"], ["discount", "Chegirmalar"]]}
+            onChange={(v) => set("source", v)}
+          />
           <Segmented label="Kompyuterda ustunlar" value={block.columns ?? "4"} options={[["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]]} onChange={(v) => set("columns", v)} />
           <Segmented label="Telefonda ustunlar" value={block.mobileColumns ?? "2"} options={[["1", "1"], ["2", "2"]]} onChange={(v) => set("mobileColumns", v)} />
           <Segmented

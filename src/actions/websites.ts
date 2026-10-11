@@ -167,7 +167,7 @@ export const getWebsite = defineAction({
 export const createWebsiteFromTemplate = defineAction({
   name: "createWebsiteFromTemplate",
   description:
-    "Tayyor shablondan sayt yaratadi (AI'siz). Shablon: market (marketpleys uslubi). Mavjud sayt bo'lsa, u almashtiriladi",
+    "Tayyor shablondan sayt yaratadi (AI'siz). Shablonlar: market, bazaar, electro, fashion, beauty, kids, gifts, home, flowers, food, sport, auto, stationery, minimal. Mavjud sayt bo'lsa, u almashtiriladi",
   requiresConfirmation: false,
   input: z.object({
     projectId: z.string().uuid(),
@@ -187,10 +187,27 @@ export const createWebsiteFromTemplate = defineAction({
     if (input.details.phone && !phone) {
       throw new ActionError("validation", "Telefon raqami noto'g'ri. Masalan: +998 90 123 45 67");
     }
-    const site = buildFromTemplate(input.templateId, {
-      ...input.details,
-      phone: phone ? formatUzPhone(phone) : "",
-    });
+    // Har bir kategoriya alohida qator bo'lib chiqishi uchun — eng ko'p mahsulotli kategoriyalar
+    const { data: catRows } = await ctx.supabase
+      .from("products")
+      .select("category")
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("is_active", true)
+      .limit(3000);
+    const counts = new Map<string, number>();
+    for (const r of (catRows ?? []) as { category: string | null }[]) {
+      const c = (r.category ?? "").trim();
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    const categories = [...counts].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    const site = buildFromTemplate(
+      input.templateId,
+      {
+        ...input.details,
+        phone: phone ? formatUzPhone(phone) : "",
+      },
+      categories,
+    );
     const saved = await saveContent(ctx, project.id, site, { brief: { template: input.templateId, ...input.details } });
     await logAudit(ctx, "website.create_from_template", { type: "project", id: project.id }, { template: input.templateId });
     return { projectId: project.id, projectName: project.name, content: site, version: saved.version, updatedAt: saved.updated_at };

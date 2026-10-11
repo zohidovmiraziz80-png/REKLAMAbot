@@ -9,6 +9,46 @@ import { createFromTemplateAction } from "./actions";
 const inputCls =
   "block w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-[15px] outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
 
+/** Shablonning kichik sxematik ko'rinishi (sarlavha, banner, mahsulot kartochkalari) */
+function TemplateThumb({ t }: { t: (typeof TEMPLATE_LIST)[number] }) {
+  const dark = t.theme.mode === "dark";
+  const bg = dark ? "#0b1020" : "#ffffff";
+  const surface = dark ? "#1a2238" : "#f1f3f7";
+  const r = t.theme.radius === "sharp" ? 2 : t.theme.radius === "round" ? 10 : 6;
+  return (
+    <div className="space-y-1.5 p-2.5" style={{ background: bg }}>
+      <div className="flex items-center gap-1.5">
+        <span className="h-2.5 w-8 rounded-sm" style={{ background: dark ? "#fff" : t.theme.primary }} />
+        <span className="h-3.5 flex-1 rounded border" style={{ borderColor: t.theme.primary, borderRadius: r / 2 }} />
+        <span className="size-3.5 rounded-full" style={{ background: t.theme.accent }} />
+      </div>
+      <div className="flex gap-1">
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className="h-1.5 w-6 rounded-full" style={{ background: surface }} />
+        ))}
+      </div>
+      <div
+        className="flex h-12 items-center px-2.5"
+        style={{
+          borderRadius: r,
+          background:
+            t.hero === "minimal" ? surface : t.hero === "promo" ? `linear-gradient(120deg, ${t.theme.primary}, ${t.theme.accent})` : t.theme.primary,
+        }}
+      >
+        <span className="h-2 w-16 rounded-full" style={{ background: t.hero === "minimal" ? t.theme.primary : "rgba(255,255,255,.85)" }} />
+      </div>
+      <div className="grid grid-cols-5 gap-1">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i}>
+            <div className="aspect-[3/4]" style={{ background: surface, borderRadius: r / 1.5 }} />
+            <div className="mt-0.5 h-1 w-3/4 rounded-full" style={{ background: t.theme.accent, opacity: 0.8 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TemplatePicker({
   projectId,
   defaultName,
@@ -75,12 +115,9 @@ export function TemplatePicker({
                 aria-pressed={active}
                 className={`overflow-hidden rounded-xl border text-left transition ${active ? "border-brand-500 ring-4 ring-brand-100" : "border-line hover:border-brand-500"}`}
               >
-                <div className="flex h-20 items-center justify-between px-4" style={{ background: t.theme.primary }}>
-                  <span className="text-3xl">{t.emoji}</span>
-                  <span className="h-6 w-16 rounded-full" style={{ background: t.theme.accent, borderRadius: t.theme.radius === "sharp" ? 4 : 999 }} />
-                </div>
+                <TemplateThumb t={t} />
                 <div className="px-4 py-3">
-                  <p className="font-semibold">{t.title}</p>
+                  <p className="font-semibold">{t.emoji} {t.title}</p>
                   <p className="mt-0.5 text-xs text-muted">{t.description}</p>
                 </div>
               </button>

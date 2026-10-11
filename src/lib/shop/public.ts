@@ -21,7 +21,7 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
     for (let from = 0; from < 3000; from += 1000) {
       const { data } = await db
         .from("products")
-        .select("id, name, description, price, old_price, category, image_url, emoji, stock")
+        .select("id, name, description, price, old_price, category, image_url, emoji, stock, created_at")
         .eq("workspace_id", workspaceId)
         .eq("is_active", true)
         .order("sort", { ascending: true })
@@ -93,6 +93,7 @@ export async function loadShopData(workspaceId: string, slug: string, opts: { pr
       emoji: (p.emoji as string) ?? "",
       inStock: p.stock === null || Number(p.stock) > 0,
       maxQty: p.stock === null ? 99 : Math.min(99, Number(p.stock)),
+      createdAt: (p.created_at as string) ?? "",
     })),
     settings: {
       acceptOrders: s?.accept_orders ?? true,
