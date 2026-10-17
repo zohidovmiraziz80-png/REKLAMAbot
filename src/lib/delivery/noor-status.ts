@@ -1,0 +1,35 @@
+/** Noor buyurtma bosqichlari (o'zbekcha) — brauzerda ham ishlatiladi */
+export const NOOR_STAGE_UZ: Record<number, string> = {
+  1: "Yangi",
+  2: "Narx hisoblanmoqda",
+  3: "To'lov kutilmoqda",
+  4: "Rejalashtirilgan",
+  5: "Kuryer qidirilmoqda",
+  6: "Kuryer qidirilmoqda",
+  7: "Kuryer topildi",
+  8: "Kuryer do'konga keldi",
+  9: "Topshirish tasdiqlanmoqda",
+  10: "Kuryer olib ketdi",
+  11: "Kuryer mijozga yetib keldi",
+  12: "Topshirish tasdiqlanmoqda",
+  13: "To'lov kutilmoqda",
+  14: "Yetkazildi",
+  15: "Yetkazildi",
+  16: "Qaytarilmoqda",
+  17: "Qaytarib keltirildi",
+  18: "Qaytarish tasdiqlanmoqda",
+  19: "Qaytarildi",
+  20: "Qaytarildi",
+  21: "Kuryer bekor qildi",
+  22: "Bekor qilindi",
+  23: "Bekor qilindi (pullik)",
+  24: "Bekor qilindi (mahsulot kuryerda)",
+  25: "Muvaffaqiyatsiz",
+  26: "Narxni hisoblab bo'lmadi",
+  27: "Kuryer topilmadi",
+  28: "Hududdan tashqarida",
+  29: "Masofa juda uzoq",
+};
+
+/** Bekor qilish mumkin bo'lgan bosqichlar (kuryer olib ketmasdan oldin) */
+export const NOOR_CANCELLABLE = (stage: number) => stage > 0 && stage < 10;

@@ -6,7 +6,7 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto";
  * Integratsiya kalitlari va sozlamalarini saqlash. Faqat serverda, service role klienti bilan.
  */
 
-export type Provider = "bito" | "payme" | "click" | "multicard" | "yandex" | "bts" | "fargo" | "eskiz" | "amocrm" | "bitrix24";
+export type Provider = "bito" | "payme" | "click" | "multicard" | "yandex" | "bts" | "fargo" | "noor" | "eskiz" | "amocrm" | "bitrix24";
 
 export const bitoSettingsSchema = z.object({
   organizationId: z.string().max(64).catch(""),

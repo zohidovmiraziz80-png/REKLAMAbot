@@ -246,7 +246,7 @@ export const retryOrderSync = defineAction({
 export const disconnectIntegration = defineAction({
   name: "disconnectIntegration",
   description: "Integratsiyani uzadi va kalitni o'chiradi. Olingan mahsulotlar saqlanib qoladi.",
-  input: z.object({ provider: z.enum(["bito", "payme", "click", "multicard", "yandex", "bts", "fargo", "eskiz", "amocrm", "bitrix24"]) }),
+  input: z.object({ provider: z.enum(["bito", "payme", "click", "multicard", "yandex", "bts", "fargo", "noor", "eskiz", "amocrm", "bitrix24"]) }),
   requiresConfirmation: true,
   minRole: "admin",
   handler: async (ctx, input) => {

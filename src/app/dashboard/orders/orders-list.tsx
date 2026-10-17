@@ -19,6 +19,8 @@ import {
 } from "@/lib/shop/format";
 import { retryOrderSyncAction, updateOrderAction } from "./actions";
 import { BtsPanel } from "./bts-panel";
+import { FargoPanel } from "./fargo-panel";
+import { NoorPanel } from "./noor-panel";
 import { CourierPanel } from "./courier-panel";
 import { YandexPanel } from "./yandex-panel";
 
@@ -37,12 +39,16 @@ export function OrdersList({
   emptyAll,
   yandex = false,
   bts = false,
+  noor = false,
+  fargo = false,
   couriers = [],
 }: {
   initial: Order[];
   emptyAll: boolean;
   yandex?: boolean;
   bts?: boolean;
+  noor?: boolean;
+  fargo?: boolean;
   couriers?: { chatId: number; name: string }[];
 }) {
   const [orders, setOrders] = useState(initial);
@@ -80,6 +86,8 @@ export function OrdersList({
           onToggle={() => setOpenId(openId === o.id ? null : o.id)}
           yandex={yandex}
           bts={bts}
+          noor={noor}
+          fargo={fargo}
           couriers={couriers}
           onChange={(patch) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...patch } : x)))}
         />
@@ -95,6 +103,8 @@ function OrderCard({
   onChange,
   yandex,
   bts,
+  noor,
+  fargo,
   couriers,
 }: {
   order: Order;
@@ -103,6 +113,8 @@ function OrderCard({
   onChange: (p: Partial<Order>) => void;
   yandex: boolean;
   bts: boolean;
+  noor: boolean;
+  fargo: boolean;
   couriers: { chatId: number; name: string }[];
 }) {
   const [pending, start] = useTransition();
@@ -312,6 +324,22 @@ function OrderCard({
             )}
             {bts && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.bts) && (
               <BtsPanel
+                orderId={o.id}
+                ext={o.external_ids ?? {}}
+                unpaid={o.payment_status !== "paid"}
+                onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })}
+              />
+            )}
+            {noor && o.delivery_method === "courier" && (o.status !== "cancelled" || o.external_ids?.noor) && (
+              <NoorPanel
+                orderId={o.id}
+                ext={o.external_ids ?? {}}
+                unpaid={o.payment_status !== "paid"}
+                onExt={(p) => onChange({ external_ids: { ...(o.external_ids ?? {}), ...p } })}
+              />
+            )}
+            {fargo && (o.status !== "cancelled" || o.external_ids?.fargo) && (
+              <FargoPanel
                 orderId={o.id}
                 ext={o.external_ids ?? {}}
                 unpaid={o.payment_status !== "paid"}

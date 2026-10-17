@@ -4,6 +4,7 @@ import { runAction } from "@/actions/run";
 import { listOrders } from "@/actions/shop";
 import { getBtsSetup, getYandexSetup } from "@/actions/delivery";
 import { getCourierSetup } from "@/actions/couriers";
+import { getFargoSetup, getNoorSetup } from "@/actions/delivery-extra";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/shop/format";
 import { OrdersList } from "./orders-list";
 
@@ -14,12 +15,16 @@ export const maxDuration = 60;
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: raw } = await searchParams;
   const status = ORDER_STATUSES.includes(raw as OrderStatus) ? (raw as OrderStatus) : undefined;
-  const [result, yandexSetup, btsSetup, courierSetup] = await Promise.all([
+  const [result, yandexSetup, btsSetup, courierSetup, noorSetup, fargoSetup] = await Promise.all([
     runAction(listOrders, { status }),
     runAction(getYandexSetup, {}),
     runAction(getBtsSetup, {}),
     runAction(getCourierSetup, {}),
+    runAction(getNoorSetup, {}),
+    runAction(getFargoSetup, {}),
   ]);
+  const noor = noorSetup.ok && noorSetup.data.complete;
+  const fargo = fargoSetup.ok && fargoSetup.data.complete;
   const couriers = courierSetup.ok ? courierSetup.data.couriers : [];
   const bts = btsSetup.ok && btsSetup.data.complete;
   const yandex = yandexSetup.ok && yandexSetup.data.connected && yandexSetup.data.status === "active";
@@ -59,7 +64,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         })}
       </nav>
 
-      <OrdersList key={status ?? "all"} initial={orders} emptyAll={counts.all === 0} yandex={yandex} bts={bts} couriers={couriers} />
+      <OrdersList key={status ?? "all"} initial={orders} emptyAll={counts.all === 0} yandex={yandex} bts={bts} noor={noor} fargo={fargo} couriers={couriers} />
     </div>
   );
 }

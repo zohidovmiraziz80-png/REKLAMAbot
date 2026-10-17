@@ -1,5 +1,21 @@
 import type { ActionDefinition } from "./define";
 import { btsCancelOrder, btsDirectory, btsEstimate, btsSend, btsTrack, connectBts, getBtsSetup, saveBtsSettings, connectYandex, getYandexSetup, yandexCancel, yandexDispatch, yandexEstimate, yandexRefresh } from "./delivery";
+import {
+  connectFargo,
+  connectNoor,
+  fargoCancelOrder,
+  fargoDirectory,
+  fargoEstimate,
+  fargoSend,
+  fargoTrack,
+  getFargoSetup,
+  getNoorSetup,
+  noorCancelOrder,
+  noorQuote,
+  noorSend,
+  noorTrack,
+  saveFargoSettings,
+} from "./delivery-extra";
 import { getMetrics } from "./metrics";
 import { assignOrderCourier, getCourierSetup, removeCourier, saveOrderAdmins } from "./couriers";
 import { connectCrm, getCrmSetup } from "./crm";
@@ -106,6 +122,20 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   btsSend,
   btsTrack,
   btsCancelOrder,
+  getNoorSetup,
+  connectNoor,
+  noorQuote,
+  noorSend,
+  noorTrack,
+  noorCancelOrder,
+  getFargoSetup,
+  connectFargo,
+  saveFargoSettings,
+  fargoDirectory,
+  fargoEstimate,
+  fargoSend,
+  fargoTrack,
+  fargoCancelOrder,
   getSettings,
   renameWorkspace,
   saveProfile,
