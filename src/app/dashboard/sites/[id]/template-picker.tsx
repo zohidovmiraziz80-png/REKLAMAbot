@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { TEMPLATE_LIST, type TemplateId } from "@/lib/site/templates";
-import { createFromTemplateAction } from "./actions";
+import { applyTemplateDesignAction, createFromTemplateAction } from "./actions";
 
 const inputCls =
   "block w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-[15px] outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
@@ -64,6 +64,9 @@ export function TemplatePicker({
   const router = useRouter();
   const [templateId, setTemplateId] = useState<TemplateId>("market");
   const [error, setError] = useState<string>();
+  // Mavjud saytda: faqat dizayn (matnlar saqlanadi) yoki to'liq almashtirish
+  const [mode, setMode] = useState<"design" | "full">("design");
+  const designOnly = replacing && mode === "design";
   const [pending, startTransition] = useTransition();
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -75,7 +78,7 @@ export function TemplatePicker({
       details[key] = String(fd.get(key) ?? "");
     }
     startTransition(async () => {
-      const result = await createFromTemplateAction(projectId, templateId, details);
+      const result = designOnly ? await applyTemplateDesignAction(projectId, templateId) : await createFromTemplateAction(projectId, templateId, details);
       if (result.ok) {
         if (replacing) router.push(`/dashboard/sites/${projectId}`);
         router.refresh();
@@ -92,11 +95,32 @@ export function TemplatePicker({
       </div>
 
       {replacing && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
-          <span>⚠️ Yangi shablon hozirgi saytning sahifalari va matnlari o&apos;rniga qo&apos;yiladi. Mahsulotlar, buyurtmalar va sozlamalar o&apos;zgarmaydi.</span>
-          <Link href={`/dashboard/sites/${projectId}`} className="font-semibold underline">
-            Bekor qilish
-          </Link>
+        <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ["design", "🎨 Faqat dizayn", "Matnlar, qatorlar va sahifalar saqlanadi — ranglar, menyu, banner va kartochkalar almashadi"],
+                ["full", "♻️ To'liq almashtirish", "Sahifalar va matnlar yangi shablonnikiga almashadi"],
+              ] as const
+            ).map(([id, title, text]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMode(id)}
+                aria-pressed={mode === id}
+                className={`rounded-xl border p-3 text-left transition ${mode === id ? "border-brand-500 ring-4 ring-brand-100" : "border-line hover:border-brand-500"}`}
+              >
+                <p className="font-semibold">{title}</p>
+                <p className="mt-0.5 text-xs text-muted">{text}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+            <span>{mode === "full" ? "⚠️ Hozirgi matnlar o'chadi. " : ""}Mahsulotlar, buyurtmalar va sozlamalar o&apos;zgarmaydi.</span>
+            <Link href={`/dashboard/sites/${projectId}`} className="font-semibold text-ink underline">
+              Bekor qilish
+            </Link>
+          </div>
         </div>
       )}
 
@@ -126,6 +150,7 @@ export function TemplatePicker({
         </div>
       </fieldset>
 
+      {!designOnly && (
       <fieldset className="space-y-3">
         <legend className="mb-2 text-sm font-medium">2. Ma&apos;lumotlar</legend>
         <label className="block">
@@ -140,13 +165,14 @@ export function TemplatePicker({
         </div>
         <p className="text-xs text-muted">Aloqa ma&apos;lumotlari ixtiyoriy — keyin ham qo&apos;shish mumkin.</p>
       </fieldset>
+      )}
 
       <button
         type="submit"
         disabled={pending}
         className="w-full rounded-lg bg-accent-500 px-4 py-3 text-[15px] font-semibold text-white hover:bg-accent-600 disabled:opacity-60"
       >
-        {pending ? "Yaratilmoqda..." : "Saytni yaratish"}
+        {pending ? "Saqlanmoqda..." : designOnly ? "Dizaynni qo'llash" : replacing ? "Shablonni qo'llash" : "Saytni yaratish"}
       </button>
 
       {aiEnabled && (

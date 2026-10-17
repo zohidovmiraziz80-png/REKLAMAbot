@@ -10,7 +10,7 @@ import {
   removeCustomDomain,
   unpublishWebsite,
 } from "@/actions/publishing";
-import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, saveWebsite } from "@/actions/websites";
+import { applyTemplateDesign, createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, saveWebsite } from "@/actions/websites";
 
 // Tahrirlovchi tugmalari amallar qatlamini shu Server Action'lar orqali chaqiradi.
 
@@ -38,6 +38,12 @@ export async function editWebsiteWithAIAction(projectId: string, instruction: st
 
 export async function saveWebsiteAction(projectId: string, content: unknown, expectedVersion: number) {
   const result = await runAction(saveWebsite, { projectId, content, expectedVersion });
+  if (result.ok) refresh(projectId);
+  return result;
+}
+
+export async function applyTemplateDesignAction(projectId: string, templateId: string) {
+  const result = await runAction(applyTemplateDesign, { projectId, templateId });
   if (result.ok) refresh(projectId);
   return result;
 }

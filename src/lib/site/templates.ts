@@ -343,3 +343,29 @@ export function buildFromTemplate(id: TemplateId, details: TemplateDetails, cate
     pages: [{ slug: "home", title: "Bosh sahifa", blocks: buildBlocks(tpl, details, categories) }],
   });
 }
+
+/**
+ * Faqat dizaynni almashtirish: matnlar, sahifalar va bloklar saqlanadi,
+ * mavzu ranglari, sarlavha/footer dizayni, banner va kartochka ko'rinishi shablonnikiga o'tadi.
+ */
+export function restyleSite(site: Site, id: TemplateId): Site {
+  const tpl = TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0];
+  const { look } = tpl;
+  return siteSchema.parse({
+    ...site,
+    theme: tpl.theme,
+    header: { ...(site.header ?? { logo: "", showNav: true, ctaText: "", ctaLink: "" }), variant: "market" },
+    footer: { ...(site.footer ?? { text: "" }), variant: look.footer },
+    pages: site.pages.map((page) => ({
+      ...page,
+      blocks: page.blocks.map((b) => {
+        if (b.type === "hero") return { ...b, variant: look.hero };
+        if (b.type === "shop") {
+          const row = b.variant === "row";
+          return { ...b, card: look.card, ratio: look.ratio, ...(row ? {} : { columns: look.columns, mobileColumns: "2" as const }) };
+        }
+        return b;
+      }),
+    })),
+  });
+}

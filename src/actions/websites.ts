@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AIError, callClaudeTool } from "@/lib/ai/claude";
 import { isAiEnabled } from "@/lib/ai/config";
-import { TEMPLATE_IDS, buildFromTemplate } from "@/lib/site/templates";
+import { TEMPLATE_IDS, buildFromTemplate, restyleSite } from "@/lib/site/templates";
 import { SITE_SYSTEM_PROMPT, buildEditMessage, buildGenerateMessage } from "@/lib/ai/site-prompts";
 import { siteSchema, type Block, type Site } from "@/lib/site/schema";
 import { SITE_TOOL } from "@/lib/site/tool-schema";
@@ -210,6 +210,24 @@ export const createWebsiteFromTemplate = defineAction({
     );
     const saved = await saveContent(ctx, project.id, site, { brief: { template: input.templateId, ...input.details } });
     await logAudit(ctx, "website.create_from_template", { type: "project", id: project.id }, { template: input.templateId });
+    return { projectId: project.id, projectName: project.name, content: site, version: saved.version, updatedAt: saved.updated_at };
+  },
+});
+
+export const applyTemplateDesign = defineAction({
+  name: "applyTemplateDesign",
+  description: "Saytning faqat dizaynini (ranglar, menyu, banner, kartochkalar) tanlangan shablonnikiga almashtiradi. Matnlar va bloklar saqlanadi",
+  requiresConfirmation: false,
+  input: z.object({ projectId: z.string().uuid(), templateId: z.enum(TEMPLATE_IDS) }),
+  handler: async (ctx, input): Promise<WebsiteRecord> => {
+    const project = await loadProject(ctx, input.projectId);
+    await requireFeature(ctx, "sites");
+    const { data } = await ctx.supabase.from("websites").select("content, version").eq("project_id", project.id).maybeSingle();
+    const current = data ? siteSchema.safeParse(data.content) : null;
+    if (!current?.success) throw new ActionError("not_found", "Avval saytni yarating");
+    const site = restyleSite(current.data, input.templateId);
+    const saved = await saveContent(ctx, project.id, site, { expectedVersion: data!.version });
+    await logAudit(ctx, "website.apply_design", { type: "project", id: project.id }, { template: input.templateId });
     return { projectId: project.id, projectName: project.name, content: site, version: saved.version, updatedAt: saved.updated_at };
   },
 });

@@ -43,7 +43,7 @@ import {
   updateCustomer,
   updateOrder,
 } from "./shop";
-import { createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
+import { applyTemplateDesign, createWebsiteFromTemplate, editWebsiteWithAI, generateWebsite, getWebsite, saveWebsite } from "./websites";
 
 /**
  * Barcha amallar reyestri. Yangi amal yozilganda shu ro'yxatga qo'shiladi.
@@ -57,6 +57,7 @@ export const actionRegistry: ActionDefinition<any, any>[] = [
   deleteProject,
   getWebsite,
   createWebsiteFromTemplate,
+  applyTemplateDesign,
   generateWebsite,
   editWebsiteWithAI,
   saveWebsite,
