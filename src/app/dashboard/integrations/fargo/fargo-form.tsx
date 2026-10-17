@@ -11,7 +11,7 @@ const input =
 export function FargoForm({ setup }: { setup: FargoSetup }) {
   const router = useRouter();
   const s = setup.settings ?? {};
-  const [baseUrl, setBaseUrl] = useState(s.baseUrl ?? "");
+  const [baseUrl, setBaseUrl] = useState(s.baseUrl ?? "https://fargo.tezbor.com");
   const [authMode, setAuthMode] = useState<"password" | "token">("password");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +48,7 @@ export function FargoForm({ setup }: { setup: FargoSetup }) {
         <h2 className="font-semibold">Qanday ulanadi</h2>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm">
           <li>
-            Fargo bilan shartnoma tuzing va menejerdan <b>API server manzili</b> hamda merchant <b>telefon + parol</b> (yoki tayyor token) so&apos;rang.
+            <b>dashboard.tezbor.uz</b> kabinetiga kiradigan <b>telefon raqam va parol</b> kerak. Parol bo&apos;lmasa: kabinet → Profil → «Сменить пароль».
           </li>
           <li>Ularni pastga o&apos;zingiz kiriting — parol va token shifrlanib saqlanadi.</li>
           <li>Jo&apos;natuvchi (do&apos;kon) ma&apos;lumotlarini to&apos;ldiring.</li>
@@ -88,7 +88,7 @@ export function FargoForm({ setup }: { setup: FargoSetup }) {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">API server manzili</span>
           <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className={`${input} font-mono`} />
-          <span className="mt-1 block text-xs text-muted">Fargo menejeri beradi (faqat domen, oxirida /api siz).</span>
+          <span className="mt-1 block text-xs text-muted">Fargo uchun: https://fargo.tezbor.com (o&apos;zgartirmang).</span>
         </label>
         <div className="flex gap-2 text-sm">
           {(
